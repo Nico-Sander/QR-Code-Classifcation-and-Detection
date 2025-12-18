@@ -1,0 +1,11 @@
+[project]
+name = "ki-project"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [ 
+	"pandas",
+	"matplotlib", 
+	"scikit-learn", 
+	"opencv-python",
+    "numpy",
+]
