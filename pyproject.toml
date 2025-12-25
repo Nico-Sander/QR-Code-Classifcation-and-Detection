@@ -8,4 +8,7 @@ dependencies = [
 	"scikit-learn", 
 	"opencv-python",
     "numpy",
+    "ipywidgets",
+    "jupyterlab",
+    "tqdm",
 ]
