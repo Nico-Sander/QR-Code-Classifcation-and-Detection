@@ -1103,7 +1103,7 @@ detect_blobs_robust("/home/nico/Pictures/Screenshots/038.png", debug = True)
 '''
 
 # Hier den Pfad zu deinem Bild einfügen
-# analyze_steps('/home/nico/Pictures/Screenshots/030.png')
+# analyze_steps('/DatenUbuntu/Studium/1. Semester/KI-Projekt/einzelbilder_mitqr/001.png')
 
 
 # --- ANWENDUNG ---
