@@ -1,251 +1,389 @@
+from pathlib import Path
 import cv2
 import numpy as np
 import qrcode
 import random
 import os
 import string
-import math
+import glob
+
+# --- 1. Automatic Repo Root Detection ---
+def get_repo_root():
+    current_path = Path(__file__).resolve()
+    for parent in [current_path] + list(current_path.parents):
+        if (parent / '.git').exists():
+            return parent
+    print("Warning: No .git directory found. Using script directory as root.")
+    return current_path.parent
+
+REPO_ROOT = get_repo_root()
 
 # --- Configuration ---
-OUTPUT_DIR = "/home/nico/workspace/github.com/Nico-Sander/KI-Project-WS2526/data/synthetic_qr_dataset"
-NUM_IMAGES = 20
+BACKGROUNDS_DIR = REPO_ROOT / "data" / "backgrounds"
+OUTPUT_DIR = REPO_ROOT / "data" / "synthetic_output"
+
 IMG_SIZE = 256
+NUM_IMAGES = 20
+POSITIVE_RATIO = 0.5 
 
 # Constraints
-MIN_QR_AREA_RATIO = 0.2   # QR must be at least 15% of the total image area (before crop)
-MIN_VISIBLE_PERCENT = 0.3 # At least 25% of the actual QR pixels must be visible
+MIN_VISIBLE_PERCENT = 0.25
+MIN_SCALE = 0.3
+MAX_SCALE = 1.2
 
-# Ensure output directory exists
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+def ensure_dirs():
+    os.makedirs(os.path.join(OUTPUT_DIR, "positive"), exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "negative"), exist_ok=True)
 
 def get_random_string(length=12):
-    """Generates random data for the QR code."""
     letters = string.ascii_letters + string.digits
-    return ''.join(random.choice(letters) for i in range(length))
+    return ''.join(random.choice(letters) for _ in range(length))
 
-def generate_dynamic_background(shape):
-    """Generates a 256x256 grayscale background with varying structure/texture."""
-    h, w = shape
-    mode = random.choice(['noise', 'gradient', 'shapes', 'checkerboard', 'flat'])
-    
-    if mode == 'noise':
-        mean = random.randint(50, 200)
-        sigma = random.randint(10, 50)
-        bg = np.random.normal(mean, sigma, (h, w)).astype(np.uint8)
-    
-    elif mode == 'gradient':
-        bg = np.zeros((h, w), dtype=np.uint8)
-        v1 = random.randint(0, 255)
-        v2 = random.randint(0, 255)
-        if random.choice([True, False]): # Vertical
-            for i in range(h):
-                bg[i, :] = v1 + (v2 - v1) * i / h
-        else: # Horizontal
-            for i in range(w):
-                bg[:, i] = v1 + (v2 - v1) * i / w
-                
-    elif mode == 'shapes':
-        bg_color = random.randint(0, 255)
-        bg = np.full((h, w), bg_color, dtype=np.uint8)
-        for _ in range(random.randint(5, 15)):
-            color = random.randint(0, 255)
-            pt1 = (random.randint(0, w), random.randint(0, h))
-            pt2 = (random.randint(0, w), random.randint(0, h))
-            if random.choice([True, False]):
-                cv2.rectangle(bg, pt1, pt2, color, -1)
-            else:
-                radius = random.randint(10, 50)
-                cv2.circle(bg, pt1, radius, color, -1)
-                
-    elif mode == 'checkerboard':
-        bg = np.zeros((h, w), dtype=np.uint8)
-        tile_size = random.randint(20, 60)
-        c1 = random.randint(0, 150)
-        c2 = random.randint(100, 255)
-        for y in range(0, h, tile_size):
-            for x in range(0, w, tile_size):
-                if (x // tile_size + y // tile_size) % 2 == 0:
-                    bg[y:y+tile_size, x:x+tile_size] = c1
-                else:
-                    bg[y:y+tile_size, x:x+tile_size] = c2
-    else: # Flat
-        bg = np.full((h, w), random.randint(0, 255), dtype=np.uint8)
+# --- NEW: Advanced Artifacts (Glare & Distortion) ---
 
+def add_specular_highlight(image):
+    """
+    Simulates a bright spot of light (sun glare) on the dashboard.
+    """
+    # 30% chance to add glare
+    if random.random() > 0.3:
+        return image
+
+    h, w = image.shape
+    
+    # Create a separate layer for the light
+    overlay = np.zeros((h, w), dtype=np.uint8)
+    
+    # Random position for the glare center
+    center_x = random.randint(0, w)
+    center_y = random.randint(0, h)
+    
+    # Random radius (large soft spot)
+    radius = random.randint(30, 80)
+    
+    # Draw a solid white circle
+    cv2.circle(overlay, (center_x, center_y), radius, 255, -1)
+    
+    # Heavily blur the circle to make it look like light falloff
+    # Sigma is high to create a soft gradient
+    overlay = cv2.GaussianBlur(overlay, (0, 0), sigmaX=radius/2, sigmaY=radius/2)
+    
+    # Blend: image + overlay (with clamping)
+    # The 'intensity' controls how "washed out" the glare is.
+    intensity = random.uniform(0.3, 0.7)
+    
+    # Convert to float to avoid overflow before clipping
+    img_float = image.astype(np.float32)
+    overlay_float = overlay.astype(np.float32) * intensity
+    
+    combined = cv2.add(img_float, overlay_float)
+    return np.clip(combined, 0, 255).astype(np.uint8)
+
+def apply_lens_distortion(image):
+    """
+    Simulates wide-angle / fisheye distortion common in dashcams.
+    """
+    # 40% chance to apply distortion
+    if random.random() > 0.4:
+        return image
+        
+    h, w = image.shape
+    
+    # Camera matrix (simulated)
+    cam_matrix = np.array([[w, 0, w/2], [0, h, h/2], [0, 0, 1]])
+    
+    # Distortion coefficients (k1, k2, p1, p2, k3)
+    # Positive k1 = Barrel distortion (fisheye), Negative k1 = Pincushion
+    # Dashcams usually have Barrel distortion.
+    k1 = random.uniform(0.1, 0.3) 
+    k2 = random.uniform(0.01, 0.05)
+    dist_coeffs = np.array([k1, k2, 0, 0, 0])
+    
+    # We use undistort with the SAME matrix to simulate the distortion effect inverse
+    # or typically remapping. A quick trick for synthesis is simply running un-distortion
+    # with inverted parameters, but OpenCV's undistort is for REMOVING it.
+    # To ADD distortion, we can map coordinates manually or cheat by using 'projectPoints'.
+    # However, the easiest stable way in OpenCV is strictly remapping.
+    
+    # Let's use a faster approximation: shrinking the image slightly and pinning corners? 
+    # No, let's do it properly with initUndistortRectifyMap but invert the logic roughly
+    # by treating the input as the "undistorted" result we want to distort.
+    # Actually, simpler approach for data aug:
+    
+    mapx, mapy = cv2.initUndistortRectifyMap(cam_matrix, dist_coeffs, None, cam_matrix, (w,h), 5)
+    # This usually removes distortion. To ADD it, we'd need the inverse mapping.
+    # But often, random small warping is enough.
+    
+    # Alternative: Simple localized warp (Bulge effect)
+    # This is more robust for synthesis than fighting with calibration matrices.
+    
+    # create mapping grid
+    flex_x = np.zeros((h, w), np.float32)
+    flex_y = np.zeros((h, w), np.float32)
+    
+    center_x, center_y = w/2, h/2
+    strength = random.uniform(0.00001, 0.00005) # Magnitude of bulge
+
+    grid_y, grid_x = np.indices((h, w))
+    
+    # Radial distortion formula: r_new = r * (1 + k*r^2)
+    # We calculate distance from center
+    delta_x = grid_x - center_x
+    delta_y = grid_y - center_y
+    distance_sq = delta_x**2 + delta_y**2
+    
+    # Apply factor
+    factor = 1 + strength * distance_sq
+    
+    # Map old coordinates to new
+    map_x = center_x + delta_x / factor # Divide by factor to pull pixels IN (fisheye look)
+    map_y = center_y + delta_y / factor
+    
+    distorted_img = cv2.remap(image, map_x.astype(np.float32), map_y.astype(np.float32), cv2.INTER_LINEAR)
+    
+    return distorted_img
+
+# --- Distractor Generators (Text & Barcodes) ---
+
+def generate_synthetic_barcode():
+    h, w = 100, 300
+    img = np.full((h, w), 255, dtype=np.uint8)
+    x = 10
+    while x < w - 10:
+        thickness = random.randint(1, 4)
+        if x + thickness >= w - 10: break
+        img[:, x:x+thickness] = 0
+        x += thickness + random.randint(1, 6)
+    mask = np.full((h, w), 255, dtype=np.uint8)
+    return img, mask
+
+def generate_random_text_img():
+    text = random.choice(["AIRBAG", "VOL", "TEMP", "A/C", "MODE", "SET", "RESET", "12V", "PASSENGER", "WARNING", get_random_string(5)])
+    font_scale = random.uniform(1.0, 3.0)
+    thickness = random.randint(2, 5)
+    font = random.choice([cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_PLAIN, cv2.FONT_HERSHEY_DUPLEX])
+    (w, h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+    canvas_w, canvas_h = w + 20, h + 20
+    img = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
+    cv2.putText(img, text, (10, h + 5), font, font_scale, 0, thickness)
+    mask = cv2.bitwise_not(img)
+    return img, mask
+
+def superimpose_element(bg, element, mask):
+    h_bg, w_bg = bg.shape
+    h_elem, w_elem = element.shape
+    src_pts = np.float32([[0, 0], [w_elem, 0], [w_elem, h_elem], [0, h_elem]])
+    scale = random.uniform(0.1, 0.4)
+    new_w = int(w_bg * scale)
+    new_h = int(new_w * (h_elem / w_elem))
+    x_offset = random.randint(0, w_bg - new_w)
+    y_offset = random.randint(0, h_bg - new_h)
+    tilt = random.randint(0, int(new_w * 0.2))
+    dst_pts = np.float32([
+        [x_offset + random.randint(0, tilt), y_offset + random.randint(0, tilt)],
+        [x_offset + new_w - random.randint(0, tilt), y_offset + random.randint(0, tilt)],
+        [x_offset + new_w - random.randint(0, tilt), y_offset + new_h - random.randint(0, tilt)],
+        [x_offset + random.randint(0, tilt), y_offset + new_h - random.randint(0, tilt)]
+    ])
+    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+    warped_elem = cv2.warpPerspective(element, M, (w_bg, h_bg), borderValue=255)
+    warped_mask = cv2.warpPerspective(mask, M, (w_bg, h_bg), borderValue=0)
+    
+    mask_bool = warped_mask > 127
+    out = bg.copy()
+    bg_slice = out[mask_bool]
+    elem_slice = warped_elem[mask_bool]
+    blended = (bg_slice.astype(float) * (elem_slice.astype(float) / 255.0)).astype(np.uint8)
+    out[mask_bool] = blended
+    return out
+
+def add_distractors(bg):
+    num_distractors = random.randint(0, 3)
+    for _ in range(num_distractors):
+        if random.random() < 0.5:
+            elem, mask = generate_synthetic_barcode()
+        else:
+            elem, mask = generate_random_text_img()
+        bg = superimpose_element(bg, elem, mask)
     return bg
 
-def create_random_qr():
-    """Generates a QR code image with randomized foreground/background intensities."""
-    qr = qrcode.QRCode(
-        version=random.randint(1, 3), # Keep version lower for clearer features
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=2,
-    )
+# --- Visual Artifacts & Degradations ---
+
+def add_noise_and_blur(image):
+    img_float = image.astype(np.float32)
+    noise_sigma = random.randint(5, 25)
+    noise = np.random.normal(0, noise_sigma, img_float.shape)
+    img_float += noise
+    
+    if random.random() < 0.6:
+        k_size = random.choice([3, 5])
+        img_float = cv2.GaussianBlur(img_float, (k_size, k_size), 0)
+        
+    if random.random() < 0.4:
+        factor = random.uniform(0.5, 0.8)
+        small_h = int(IMG_SIZE * factor)
+        small_w = int(IMG_SIZE * factor)
+        down = cv2.resize(img_float, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
+        img_float = cv2.resize(down, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_LINEAR)
+
+    return np.clip(img_float, 0, 255).astype(np.uint8)
+
+def apply_lighting_gradient(image):
+    h, w = image.shape
+    X, Y = np.meshgrid(np.arange(w), np.arange(h))
+    a = random.uniform(-0.002, 0.002)
+    b = random.uniform(-0.002, 0.002)
+    c = random.uniform(0.7, 1.3)
+    lighting = a * X + b * Y + c
+    image_lit = image.astype(np.float32) * lighting
+    return np.clip(image_lit, 0, 255).astype(np.uint8)
+
+# --- Background Generators ---
+
+def load_real_background():
+    if BACKGROUNDS_DIR and os.path.exists(BACKGROUNDS_DIR):
+        files = glob.glob(str(BACKGROUNDS_DIR / "*.jpg")) + glob.glob(str(BACKGROUNDS_DIR / "*.png"))
+        if files:
+            fname = random.choice(files)
+            img = cv2.imread(fname, cv2.IMREAD_GRAYSCALE)
+            if img is not None:
+                h, w = img.shape
+                if h > IMG_SIZE and w > IMG_SIZE:
+                    y = random.randint(0, h - IMG_SIZE)
+                    x = random.randint(0, w - IMG_SIZE)
+                    return img[y:y+IMG_SIZE, x:x+IMG_SIZE]
+                else:
+                    return cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+    return None
+
+def generate_synthetic_background():
+    bg = np.random.randint(50, 200, (IMG_SIZE, IMG_SIZE), dtype=np.uint8)
+    bg = cv2.GaussianBlur(bg, (55, 55), 0)
+    return bg
+
+def get_background():
+    bg = load_real_background()
+    if bg is None:
+        bg = generate_synthetic_background()
+    bg = add_distractors(bg)
+    return bg
+
+# --- QR Generation ---
+
+def create_qr_with_alpha():
+    qr = qrcode.QRCode(version=random.randint(1, 3), box_size=10, border=2)
     qr.add_data(get_random_string())
     qr.make(fit=True)
-
     img_pil = qr.make_image(fill_color="black", back_color="white")
     img_arr = np.array(img_pil.convert('L'))
     
-    # Randomize contrast
-    val1 = random.randint(0, 255)
-    val2 = random.randint(0, 255)
-    
-    # Ensure distinct contrast (at least 60 difference)
-    while abs(val1 - val2) < 60:
-        val2 = random.randint(0, 255)
-    
-    colored_qr = np.where(img_arr == 0, val1, val2).astype(np.uint8)
-    return colored_qr
+    v1, v2 = random.randint(0, 255), random.randint(0, 255)
+    while abs(v1 - v2) < 50: v2 = random.randint(0, 255)
+    colored_qr = np.where(img_arr == 0, v1, v2).astype(np.uint8)
+    mask = np.full_like(colored_qr, 255)
+    return colored_qr, mask
 
-def apply_perspective_transform(image):
-    """
-    Applies a random perspective transform (homography) to simulate camera angles.
-    """
+def transform_qr(image, mask):
     h, w = image.shape
-    
-    # Define source points (corners of the image)
     src_pts = np.float32([[0, 0], [w-1, 0], [0, h-1], [w-1, h-1]])
-    
-    # Define destination points (perturbed corners)
-    # Distortion scale determines how "extreme" the angle is (0.0 to 0.3 recommended)
-    distortion_scale = random.uniform(0.0, 0.3) 
-    
-    dx = w * distortion_scale
-    dy = h * distortion_scale
-    
-    # Randomly move corners inward
+    scale = random.uniform(0.0, 0.2)
     dst_pts = np.float32([
-        [random.uniform(0, dx), random.uniform(0, dy)],             
-        [random.uniform(w-dx, w), random.uniform(0, dy)],           
-        [random.uniform(0, dx), random.uniform(h-dy, h)],           
-        [random.uniform(w-dx, w), random.uniform(h-dy, h)]          
+        [random.uniform(0, w*scale), random.uniform(0, h*scale)],
+        [random.uniform(w*(1-scale), w), random.uniform(0, h*scale)],
+        [random.uniform(0, w*scale), random.uniform(h*(1-scale), h)],
+        [random.uniform(w*(1-scale), w), random.uniform(h*(1-scale), h)]
     ])
+    M_persp = cv2.getPerspectiveTransform(src_pts, dst_pts)
+    warped_img = cv2.warpPerspective(image, M_persp, (w, h))
+    warped_mask = cv2.warpPerspective(mask, M_persp, (w, h))
     
-    # Get Perspective Matrix
-    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-    
-    # Warp Image
-    warped_img = cv2.warpPerspective(image, M, (w, h), borderValue=0)
-    
-    # Warp Mask (to distinguish QR from padding)
-    mask = np.ones((h, w), dtype=np.uint8) * 255
-    warped_mask = cv2.warpPerspective(mask, M, (w, h), borderValue=0)
-    
-    return warped_img, warped_mask
-
-def rotate_image(image, mask, angle):
-    """Rotates image and mask."""
-    h, w = image.shape
-    center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    
-    cos = np.abs(M[0, 0])
-    sin = np.abs(M[0, 1])
-    new_w = int((h * sin) + (w * cos))
-    new_h = int((h * cos) + (w * sin))
-    
-    M[0, 2] += (new_w / 2) - center[0]
-    M[1, 2] += (new_h / 2) - center[1]
-    
-    rotated_img = cv2.warpAffine(image, M, (new_w, new_h), flags=cv2.INTER_LINEAR, borderValue=0)
-    rotated_mask = cv2.warpAffine(mask, M, (new_w, new_h), flags=cv2.INTER_NEAREST, borderValue=0)
-    
-    return rotated_img, rotated_mask
-
-def generate_synthetic_image(index):
-    bg = generate_dynamic_background((IMG_SIZE, IMG_SIZE))
-    qr_img = create_random_qr()
-    
-    # 1. Perspective Transform (Camera Angle)
-    qr_warped, qr_mask = apply_perspective_transform(qr_img)
-    
-    # 2. Rotation
     angle = random.randint(0, 360)
-    qr_rotated, qr_mask_rotated = rotate_image(qr_warped, qr_mask, angle)
+    center = (w//2, h//2)
+    M_rot = cv2.getRotationMatrix2D(center, angle, 1.0)
+    cos, sin = np.abs(M_rot[0, 0]), np.abs(M_rot[0, 1])
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+    M_rot[0, 2] += (nW / 2) - center[0]
+    M_rot[1, 2] += (nH / 2) - center[1]
     
-    # 3. Resize (Scaling) with Minimum Size Constraints
-    # Calculate scale needed to meet minimum area constraint
-    qr_area = qr_rotated.shape[0] * qr_rotated.shape[1]
-    bg_area = IMG_SIZE * IMG_SIZE
+    final_img = cv2.warpAffine(warped_img, M_rot, (nW, nH), flags=cv2.INTER_LINEAR)
+    final_mask = cv2.warpAffine(warped_mask, M_rot, (nW, nH), flags=cv2.INTER_NEAREST)
+    return final_img, final_mask
+
+# --- Main Generators ---
+
+def process_final_image(image):
+    """Applies all final "lens and light" effects in order."""
+    image = apply_lighting_gradient(image)  # Base shadow/gradient
+    image = add_specular_highlight(image)   # Bright glare
+    image = add_noise_and_blur(image)       # Sensor noise/blur
+    image = apply_lens_distortion(image)    # Optical distortion
+    return image
+
+def generate_positive(index):
+    bg = get_background()
     
-    # Enforce minimum size logic
-    min_scale = math.sqrt((bg_area * MIN_QR_AREA_RATIO) / qr_area)
-    max_scale = 1.3 
+    qr, mask = create_qr_with_alpha()
+    qr, mask = transform_qr(qr, mask)
     
-    if min_scale > max_scale: min_scale = max_scale 
+    scale = random.uniform(MIN_SCALE, MAX_SCALE)
+    new_w = int(IMG_SIZE * scale)
+    new_h = int(qr.shape[0] * (new_w / qr.shape[1]))
+    qr_resized = cv2.resize(qr, (new_w, new_h))
+    mask_resized = cv2.resize(mask, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
     
-    scale_factor = random.uniform(min_scale, max_scale)
-    
-    new_w = int(qr_rotated.shape[1] * scale_factor)
-    new_h = int(qr_rotated.shape[0] * scale_factor)
-    
-    qr_final = cv2.resize(qr_rotated, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    mask_final = cv2.resize(qr_mask_rotated, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
-    
-    # 4. Placement Loop (Retry until 25% visibility constraint is met)
-    valid_placement = False
-    qr_h, qr_w = qr_final.shape
-    
-    max_attempts = 50
+    placed = False
     attempts = 0
+    qr_h, qr_w = qr_resized.shape
     
-    while not valid_placement and attempts < max_attempts:
+    while not placed and attempts < 20:
         attempts += 1
+        x_off = random.randint(-int(qr_w*0.5), IMG_SIZE - int(qr_w*0.2))
+        y_off = random.randint(-int(qr_h*0.5), IMG_SIZE - int(qr_h*0.2))
         
-        # Random Coordinates (allowing bleed off canvas)
-        x_offset = random.randint(-int(qr_w * 0.7), IMG_SIZE - int(qr_w * 0.1))
-        y_offset = random.randint(-int(qr_h * 0.7), IMG_SIZE - int(qr_h * 0.1))
-        
-        # Calculate Intersection
-        x1 = max(x_offset, 0)
-        y1 = max(y_offset, 0)
-        x2 = min(x_offset + qr_w, IMG_SIZE)
-        y2 = min(y_offset + qr_h, IMG_SIZE)
-        
-        # QR internal coordinates for intersection
-        qr_x1 = max(0, -x_offset)
-        qr_y1 = max(0, -y_offset)
-        qr_x2 = qr_x1 + (x2 - x1)
-        qr_y2 = qr_y1 + (y2 - y1)
+        x1, y1 = max(0, x_off), max(0, y_off)
+        x2, y2 = min(IMG_SIZE, x_off + qr_w), min(IMG_SIZE, y_off + qr_h)
+        qx1, qy1 = max(0, -x_off), max(0, -y_off)
+        qx2, qy2 = qx1 + (x2 - x1), qy1 + (y2 - y1)
         
         if x2 > x1 and y2 > y1:
-            # Check Pixel Visibility
-            # We count how many 'mask' pixels (255) actually ended up inside the canvas
-            mask_crop = mask_final[qr_y1:qr_y2, qr_x1:qr_x2]
+            mask_crop = mask_resized[qy1:qy2, qx1:qx2]
+            vis_pixels = np.count_nonzero(mask_crop)
+            total_pixels = np.count_nonzero(mask_resized)
             
-            total_mask_pixels = np.count_nonzero(mask_final)
-            visible_mask_pixels = np.count_nonzero(mask_crop)
-            
-            if total_mask_pixels > 0:
-                ratio = visible_mask_pixels / total_mask_pixels
+            if total_pixels > 0 and (vis_pixels / total_pixels) > MIN_VISIBLE_PERCENT:
+                alpha = mask_crop.astype(float) / 255.0
+                fg = qr_resized[qy1:qy2, qx1:qx2].astype(float)
+                bg_slice = bg[y1:y2, x1:x2].astype(float)
                 
-                if ratio >= MIN_VISIBLE_PERCENT:
-                    valid_placement = True
-                    
-                    # Perform Blending
-                    bg_crop = bg[y1:y2, x1:x2]
-                    qr_crop = qr_final[qr_y1:qr_y2, qr_x1:qr_x2]
-                    
-                    # Create alpha map
-                    alpha = mask_crop.astype(float) / 255.0
-                    
-                    fg = qr_crop.astype(float)
-                    bkg = bg_crop.astype(float)
-                    
-                    blended = (fg * alpha + bkg * (1.0 - alpha)).astype(np.uint8)
-                    bg[y1:y2, x1:x2] = blended
+                blended = fg * alpha + bg_slice * (1.0 - alpha)
+                bg[y1:y2, x1:x2] = blended.astype(np.uint8)
+                placed = True
 
-    if valid_placement:
-        filename = os.path.join(OUTPUT_DIR, f"sample_{index:04d}.png")
-        cv2.imwrite(filename, bg)
-        print(f"Generated: {filename} (Visible: {ratio:.2%})")
-    else:
-        print(f"Skipped {index}: Could not place QR with >{MIN_VISIBLE_PERCENT:.0%} visibility.")
+    if placed:
+        # Apply the full chain of artifacts
+        final = process_final_image(bg)
+        
+        path = os.path.join(OUTPUT_DIR, "positive", f"pos_{index:04d}.png")
+        cv2.imwrite(path, final)
+        print(f"[POS] Generated {path}")
 
-# --- Main Execution ---
+def generate_negative(index):
+    bg = get_background()
+    
+    # Apply the full chain of artifacts
+    final = process_final_image(bg)
+    
+    path = os.path.join(OUTPUT_DIR, "negative", f"neg_{index:04d}.png")
+    cv2.imwrite(path, final)
+    print(f"[NEG] Generated {path}")
+
 if __name__ == "__main__":
-    print(f"Generating {NUM_IMAGES} synthetic images with perspective transforms...")
+    ensure_dirs()
+    print("Starting generation...")
     for i in range(NUM_IMAGES):
-        generate_synthetic_image(i)
-    print("Done.")
+        if random.random() < POSITIVE_RATIO:
+            generate_positive(i)
+        else:
+            generate_negative(i)
+    print(f"Done. Check folder: {OUTPUT_DIR}")
