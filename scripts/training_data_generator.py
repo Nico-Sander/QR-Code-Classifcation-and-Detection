@@ -20,16 +20,16 @@ REPO_ROOT = get_repo_root()
 
 # --- Configuration ---
 BACKGROUNDS_DIR = REPO_ROOT / "data" / "backgrounds"
-OUTPUT_DIR = REPO_ROOT / "data" / "synthetic_output"
+OUTPUT_DIR = REPO_ROOT / "data" / "synthetic_patches"
 
 IMG_SIZE = 256
-NUM_IMAGES = 20
+NUM_IMAGES = 40
 POSITIVE_RATIO = 0.5 
 
 # Constraints
-MIN_VISIBLE_PERCENT = 0.25
-MIN_SCALE = 0.3
-MAX_SCALE = 1.2
+MIN_VISIBLE_PERCENT = 0.65
+MIN_SCALE = 0.4
+MAX_SCALE = 1.4
 
 def ensure_dirs():
     os.makedirs(os.path.join(OUTPUT_DIR, "positive"), exist_ok=True)
@@ -65,14 +65,11 @@ def add_specular_highlight(image):
     cv2.circle(overlay, (center_x, center_y), radius, 255, -1)
     
     # Heavily blur the circle to make it look like light falloff
-    # Sigma is high to create a soft gradient
     overlay = cv2.GaussianBlur(overlay, (0, 0), sigmaX=radius/2, sigmaY=radius/2)
     
     # Blend: image + overlay (with clamping)
-    # The 'intensity' controls how "washed out" the glare is.
-    intensity = random.uniform(0.3, 0.7)
+    intensity = random.uniform(0.1, 0.5)
     
-    # Convert to float to avoid overflow before clipping
     img_float = image.astype(np.float32)
     overlay_float = overlay.astype(np.float32) * intensity
     
@@ -88,96 +85,178 @@ def apply_lens_distortion(image):
         return image
         
     h, w = image.shape
+    center_x, center_y = w / 2.0, h / 2.0
     
-    # Camera matrix (simulated)
-    cam_matrix = np.array([[w, 0, w/2], [0, h, h/2], [0, 0, 1]])
-    
-    # Distortion coefficients (k1, k2, p1, p2, k3)
-    # Positive k1 = Barrel distortion (fisheye), Negative k1 = Pincushion
-    # Dashcams usually have Barrel distortion.
-    k1 = random.uniform(0.1, 0.3) 
-    k2 = random.uniform(0.01, 0.05)
-    dist_coeffs = np.array([k1, k2, 0, 0, 0])
-    
-    # We use undistort with the SAME matrix to simulate the distortion effect inverse
-    # or typically remapping. A quick trick for synthesis is simply running un-distortion
-    # with inverted parameters, but OpenCV's undistort is for REMOVING it.
-    # To ADD distortion, we can map coordinates manually or cheat by using 'projectPoints'.
-    # However, the easiest stable way in OpenCV is strictly remapping.
-    
-    # Let's use a faster approximation: shrinking the image slightly and pinning corners? 
-    # No, let's do it properly with initUndistortRectifyMap but invert the logic roughly
-    # by treating the input as the "undistorted" result we want to distort.
-    # Actually, simpler approach for data aug:
-    
-    mapx, mapy = cv2.initUndistortRectifyMap(cam_matrix, dist_coeffs, None, cam_matrix, (w,h), 5)
-    # This usually removes distortion. To ADD it, we'd need the inverse mapping.
-    # But often, random small warping is enough.
-    
-    # Alternative: Simple localized warp (Bulge effect)
-    # This is more robust for synthesis than fighting with calibration matrices.
-    
-    # create mapping grid
-    flex_x = np.zeros((h, w), np.float32)
-    flex_y = np.zeros((h, w), np.float32)
-    
-    center_x, center_y = w/2, h/2
-    strength = random.uniform(0.00001, 0.00005) # Magnitude of bulge
+    # Reduced strength for subtle curvature
+    strength = random.uniform(0.000001, 0.000005)
 
-    grid_y, grid_x = np.indices((h, w))
+    grid_y, grid_x = np.indices((h, w), dtype=np.float32)
     
-    # Radial distortion formula: r_new = r * (1 + k*r^2)
-    # We calculate distance from center
     delta_x = grid_x - center_x
     delta_y = grid_y - center_y
     distance_sq = delta_x**2 + delta_y**2
     
-    # Apply factor
-    factor = 1 + strength * distance_sq
+    # Radial distortion formula
+    factor = 1.0 + strength * distance_sq
     
     # Map old coordinates to new
-    map_x = center_x + delta_x / factor # Divide by factor to pull pixels IN (fisheye look)
+    map_x = center_x + delta_x / factor
     map_y = center_y + delta_y / factor
     
-    distorted_img = cv2.remap(image, map_x.astype(np.float32), map_y.astype(np.float32), cv2.INTER_LINEAR)
+    # Use standard linear interpolation
+    distorted_img = cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR)
     
     return distorted_img
 
 # --- Distractor Generators (Text & Barcodes) ---
+def get_distractor_vocabulary():
+    """Returns a large list of words found in cars or on packages."""
+    car_terms = [
+        "AIRBAG", "VOL", "TEMP", "A/C", "MODE", "SET", "RESET", "12V", 
+        "PASSENGER", "WARNING", "FUSE", "OBD", "CHECK ENGINE", "MPH", "km/h",
+        "RPM", "OIL", "BRAKE", "ABS", "TCS", "AUTO", "MENU", "INFO"
+    ]
+    shipping_terms = [
+        "FRAGILE", "PRIORITY", "EXPEDITE", "HANDLE WITH CARE", "DO NOT DROP",
+        "THIS SIDE UP", "KEEP DRY", "URGENT", "DELIVERY", "LOGISTICS",
+        "ZONE 1", "ZONE 5", "GROUND", "AIR", "PART NO.", "S/N:", "REF:",
+        "BATCH:", "LOT:", "QTY:", "WEIGHT:", "INSPECTED BY"
+    ]
+    # Generate some random alphanumeric strings
+    random_codes = [get_random_string(random.randint(4, 12)) for _ in range(20)]
+    
+    return car_terms + shipping_terms + random_codes
 
-def generate_synthetic_barcode():
-    h, w = 100, 300
-    img = np.full((h, w), 255, dtype=np.uint8)
-    x = 10
-    while x < w - 10:
-        thickness = random.randint(1, 4)
-        if x + thickness >= w - 10: break
-        img[:, x:x+thickness] = 0
-        x += thickness + random.randint(1, 6)
+def make_paper_texture(h, w):
+    """
+    Creates a background that looks like a sticker or paper label.
+    Instead of pure white, it has noise and slight gray variations.
+    """
+    # Base off-white color (230-255)
+    base = np.random.randint(230, 256, (h, w), dtype=np.uint8)
+    
+    # Add subtle grain/noise
+    noise = np.random.normal(0, 5, (h, w))
+    texture = np.clip(base + noise, 0, 255).astype(np.uint8)
+    
+    # Optional: Add a subtle border 50% of the time
+    if random.random() < 0.5:
+        border_thickness = random.randint(1, 5)
+        cv2.rectangle(texture, (0,0), (w-1, h-1), random.randint(0, 100), border_thickness)
+        
+    return texture
+
+def generate_realistic_barcode():
+    """
+    Generates a barcode that looks like a printed sticker
+    with numbers at the bottom.
+    """
+    # Random dimensions for a label shape
+    w = random.randint(150, 300)
+    h = random.randint(80, 150)
+    
+    # Create paper background
+    img = make_paper_texture(h, w)
+    
+    # Define barcode area (leave space at bottom for numbers)
+    bar_h = int(h * 0.7)
+    
+    # Draw vertical bars
+    x = random.randint(10, 20)
+    end_x = w - random.randint(10, 20)
+    
+    while x < end_x:
+        # Variable bar width
+        thickness = random.choice([1, 2, 3, 4])
+        if x + thickness >= end_x:
+            break
+            
+        # Draw black bar with some noise (not perfect black)
+        color = random.randint(0, 50) 
+        cv2.rectangle(img, (x, 10), (x + thickness, 10 + bar_h), color, -1)
+        
+        # Variable gap
+        gap = random.choice([1, 2, 3])
+        x += thickness + gap
+
+    # Add "Human Readable" numbers below
+    font = cv2.FONT_HERSHEY_PLAIN
+    text = get_random_string(random.randint(8, 12))
+    scale = random.uniform(0.8, 1.2)
+    thk = 1
+    (fw, fh), _ = cv2.getTextSize(text, font, scale, thk)
+    
+    # Center text below bars
+    text_x = (w - fw) // 2
+    text_y = h - 5
+    if text_x > 0:
+        cv2.putText(img, text, (text_x, text_y), font, scale, 0, thk)
+
+    # Mask: The whole label is the object
+    mask = np.full((h, w), 255, dtype=np.uint8)
+    
+    return img, mask
+
+def generate_realistic_text_label():
+    """
+    Generates either a single button label OR a multi-line shipping label.
+    """
+    vocab = get_distractor_vocabulary()
+    
+    # Mode 1: Shipping Label (Multi-line) - 40% chance
+    if random.random() < 0.4:
+        w = random.randint(120, 200)
+        h = random.randint(80, 150)
+        img = make_paper_texture(h, w)
+        
+        # Pick 2-4 words
+        num_lines = random.randint(2, 4)
+        y = 25
+        for _ in range(num_lines):
+            text = random.choice(vocab)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            scale = random.uniform(0.3, 0.5)
+            cv2.putText(img, text, (10, y), font, scale, 0, 1)
+            y += 25
+            
+    # Mode 2: Dashboard Button/Warning (Single large word) - 60% chance
+    else:
+        text = random.choice(vocab)
+        font = random.choice([cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_DUPLEX, cv2.FONT_HERSHEY_TRIPLEX])
+        scale = random.uniform(1.0, 2.5)
+        thickness = random.randint(2, 4)
+        (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+        
+        # Add padding for the sticker background
+        w = tw + 40
+        h = th + 40
+        img = make_paper_texture(h, w)
+        
+        # Draw text centered
+        cv2.putText(img, text, (20, h - 20), font, scale, 0, thickness)
+
     mask = np.full((h, w), 255, dtype=np.uint8)
     return img, mask
 
-def generate_random_text_img():
-    text = random.choice(["AIRBAG", "VOL", "TEMP", "A/C", "MODE", "SET", "RESET", "12V", "PASSENGER", "WARNING", get_random_string(5)])
-    font_scale = random.uniform(1.0, 3.0)
-    thickness = random.randint(2, 5)
-    font = random.choice([cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_PLAIN, cv2.FONT_HERSHEY_DUPLEX])
-    (w, h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-    canvas_w, canvas_h = w + 20, h + 20
-    img = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
-    cv2.putText(img, text, (10, h + 5), font, font_scale, 0, thickness)
-    mask = cv2.bitwise_not(img)
-    return img, mask
-
+# --- ADDED: The missing function ---
 def superimpose_element(bg, element, mask):
+    """
+    Warps and blends an element (barcode/text) onto the background.
+    """
     h_bg, w_bg = bg.shape
     h_elem, w_elem = element.shape
+    
+    # 1. Random Perspective Warp
     src_pts = np.float32([[0, 0], [w_elem, 0], [w_elem, h_elem], [0, h_elem]])
-    scale = random.uniform(0.1, 0.4)
+    
+    # Destination: Random scale and location
+    scale = random.uniform(0.1, 0.4) 
     new_w = int(w_bg * scale)
     new_h = int(new_w * (h_elem / w_elem))
+    
     x_offset = random.randint(0, w_bg - new_w)
     y_offset = random.randint(0, h_bg - new_h)
+    
     tilt = random.randint(0, int(new_w * 0.2))
     dst_pts = np.float32([
         [x_offset + random.randint(0, tilt), y_offset + random.randint(0, tilt)],
@@ -185,25 +264,33 @@ def superimpose_element(bg, element, mask):
         [x_offset + new_w - random.randint(0, tilt), y_offset + new_h - random.randint(0, tilt)],
         [x_offset + random.randint(0, tilt), y_offset + new_h - random.randint(0, tilt)]
     ])
+    
     M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-    warped_elem = cv2.warpPerspective(element, M, (w_bg, h_bg), borderValue=255)
+    warped_elem = cv2.warpPerspective(element, M, (w_bg, h_bg), borderValue=0)
     warped_mask = cv2.warpPerspective(mask, M, (w_bg, h_bg), borderValue=0)
     
+    # 2. Blend
     mask_bool = warped_mask > 127
     out = bg.copy()
     bg_slice = out[mask_bool]
     elem_slice = warped_elem[mask_bool]
-    blended = (bg_slice.astype(float) * (elem_slice.astype(float) / 255.0)).astype(np.uint8)
+    
+    # Blend with slight transparency
+    alpha = 0.95
+    blended = (elem_slice.astype(float) * alpha + bg_slice.astype(float) * (1 - alpha)).astype(np.uint8)
+    
     out[mask_bool] = blended
     return out
 
 def add_distractors(bg):
+    """Adds random realistic labels or barcodes to the background."""
     num_distractors = random.randint(0, 3)
     for _ in range(num_distractors):
         if random.random() < 0.5:
-            elem, mask = generate_synthetic_barcode()
+            elem, mask = generate_realistic_barcode()
         else:
-            elem, mask = generate_random_text_img()
+            elem, mask = generate_realistic_text_label()
+        
         bg = superimpose_element(bg, elem, mask)
     return bg
 
@@ -211,12 +298,12 @@ def add_distractors(bg):
 
 def add_noise_and_blur(image):
     img_float = image.astype(np.float32)
-    noise_sigma = random.randint(5, 25)
+    noise_sigma = random.randint(5, 20)
     noise = np.random.normal(0, noise_sigma, img_float.shape)
     img_float += noise
     
     if random.random() < 0.6:
-        k_size = random.choice([3, 5])
+        k_size = random.choice([3, 7])
         img_float = cv2.GaussianBlur(img_float, (k_size, k_size), 0)
         
     if random.random() < 0.4:
@@ -277,9 +364,15 @@ def create_qr_with_alpha():
     img_pil = qr.make_image(fill_color="black", back_color="white")
     img_arr = np.array(img_pil.convert('L'))
     
-    v1, v2 = random.randint(0, 255), random.randint(0, 255)
-    while abs(v1 - v2) < 50: v2 = random.randint(0, 255)
+    if random.random() < 0.90:
+        v1 = random.randint(0, 60)
+        v2 = random.randint(200, 255)
+    else:
+        v1 = random.randint(200, 255)
+        v2 = random.randint(0, 60)
+        
     colored_qr = np.where(img_arr == 0, v1, v2).astype(np.uint8)
+    
     mask = np.full_like(colored_qr, 255)
     return colored_qr, mask
 
@@ -313,67 +406,74 @@ def transform_qr(image, mask):
 # --- Main Generators ---
 
 def process_final_image(image):
-    """Applies all final "lens and light" effects in order."""
-    image = apply_lighting_gradient(image)  # Base shadow/gradient
-    image = add_specular_highlight(image)   # Bright glare
-    image = add_noise_and_blur(image)       # Sensor noise/blur
-    image = apply_lens_distortion(image)    # Optical distortion
+    image = apply_lighting_gradient(image)
+    image = add_specular_highlight(image)
+    image = add_noise_and_blur(image)
+    image = apply_lens_distortion(image)
     return image
 
 def generate_positive(index):
-    bg = get_background()
-    
-    qr, mask = create_qr_with_alpha()
-    qr, mask = transform_qr(qr, mask)
-    
-    scale = random.uniform(MIN_SCALE, MAX_SCALE)
-    new_w = int(IMG_SIZE * scale)
-    new_h = int(qr.shape[0] * (new_w / qr.shape[1]))
-    qr_resized = cv2.resize(qr, (new_w, new_h))
-    mask_resized = cv2.resize(mask, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
-    
-    placed = False
-    attempts = 0
-    qr_h, qr_w = qr_resized.shape
-    
-    while not placed and attempts < 20:
-        attempts += 1
-        x_off = random.randint(-int(qr_w*0.5), IMG_SIZE - int(qr_w*0.2))
-        y_off = random.randint(-int(qr_h*0.5), IMG_SIZE - int(qr_h*0.2))
+    while True:
+        bg = get_background()
         
-        x1, y1 = max(0, x_off), max(0, y_off)
-        x2, y2 = min(IMG_SIZE, x_off + qr_w), min(IMG_SIZE, y_off + qr_h)
-        qx1, qy1 = max(0, -x_off), max(0, -y_off)
-        qx2, qy2 = qx1 + (x2 - x1), qy1 + (y2 - y1)
+        qr, mask = create_qr_with_alpha()
+        qr, mask = transform_qr(qr, mask)
         
-        if x2 > x1 and y2 > y1:
-            mask_crop = mask_resized[qy1:qy2, qx1:qx2]
-            vis_pixels = np.count_nonzero(mask_crop)
-            total_pixels = np.count_nonzero(mask_resized)
+        scale = random.uniform(MIN_SCALE, MAX_SCALE)
+        new_w = int(IMG_SIZE * scale)
+        new_h = int(qr.shape[0] * (new_w / qr.shape[1]))
+        qr_resized = cv2.resize(qr, (new_w, new_h))
+        mask_resized = cv2.resize(mask, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+        
+        placed = False
+        qr_h, qr_w = qr_resized.shape
+        
+        for _ in range(20):
+            x_off = random.randint(-int(qr_w*0.5), IMG_SIZE - int(qr_w*0.2))
+            y_off = random.randint(-int(qr_h*0.5), IMG_SIZE - int(qr_h*0.2))
             
-            if total_pixels > 0 and (vis_pixels / total_pixels) > MIN_VISIBLE_PERCENT:
-                alpha = mask_crop.astype(float) / 255.0
-                fg = qr_resized[qy1:qy2, qx1:qx2].astype(float)
-                bg_slice = bg[y1:y2, x1:x2].astype(float)
+            x1, y1 = max(0, x_off), max(0, y_off)
+            x2, y2 = min(IMG_SIZE, x_off + qr_w), min(IMG_SIZE, y_off + qr_h)
+            qx1, qy1 = max(0, -x_off), max(0, -y_off)
+            qx2, qy2 = qx1 + (x2 - x1), qy1 + (y2 - y1)
+            
+            if x2 > x1 and y2 > y1:
+                mask_crop = mask_resized[qy1:qy2, qx1:qx2]
+                vis_pixels = np.count_nonzero(mask_crop)
+                total_pixels = np.count_nonzero(mask_resized)
                 
-                blended = fg * alpha + bg_slice * (1.0 - alpha)
-                bg[y1:y2, x1:x2] = blended.astype(np.uint8)
-                placed = True
-
-    if placed:
-        # Apply the full chain of artifacts
-        final = process_final_image(bg)
+                if total_pixels > 0 and (vis_pixels / total_pixels) > MIN_VISIBLE_PERCENT:
+                    alpha = mask_crop.astype(float) / 255.0
+                    fg = qr_resized[qy1:qy2, qx1:qx2].astype(float)
+                    bg_slice = bg[y1:y2, x1:x2].astype(float)
+                    
+                    blended = fg * alpha + bg_slice * (1.0 - alpha)
+                    bg[y1:y2, x1:x2] = blended.astype(np.uint8)
+                    placed = True
+                    
+                    final_mask = np.zeros((IMG_SIZE, IMG_SIZE), dtype=np.uint8)
+                    final_mask[y1:y2, x1:x2] = mask_crop
+                    break
         
-        path = os.path.join(OUTPUT_DIR, "positive", f"pos_{index:04d}.png")
-        cv2.imwrite(path, final)
-        print(f"[POS] Generated {path}")
+        if placed:
+            final_img = process_final_image(bg)
+            
+            qr_pixels = final_img[final_mask > 0]
+            
+            if qr_pixels.size > 0:
+                contrast = np.std(qr_pixels)
+                
+                if contrast > 30:
+                    path = os.path.join(OUTPUT_DIR, "positive", f"pos_{index:04d}.png")
+                    cv2.imwrite(path, final_img)
+                    print(f"[POS] Generated {path} (Contrast: {contrast:.1f})")
+                    return
+                else:
+                    print(f"   [Retry] Discarding washed out image (Contrast: {contrast:.1f})")
 
 def generate_negative(index):
     bg = get_background()
-    
-    # Apply the full chain of artifacts
     final = process_final_image(bg)
-    
     path = os.path.join(OUTPUT_DIR, "negative", f"neg_{index:04d}.png")
     cv2.imwrite(path, final)
     print(f"[NEG] Generated {path}")
