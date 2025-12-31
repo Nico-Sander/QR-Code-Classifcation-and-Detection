@@ -1,0 +1,55 @@
+project_name: "windscreen_qr_classifier"
+
+dataset:
+  total_images: 40000
+  positive_ratio: 0.5
+  img_size: 256
+  seed: 42
+  cleanup_intermediate: false
+
+paths:
+  raw_real: "data/real_patches"
+  raw_synthetic: "data/synthetic_patches"
+  backgrounds: "data/backgrounds"
+  processed: "data/processed_patches"
+
+# All generator constants are now here
+generation:
+  # Visibility & Placement
+  min_visible_percent: 0.6
+  min_scale: 0.3
+  max_scale: 1.5
+  contrast_threshold: 20
+  placement_retries: 10
+  
+  # QR Appearance
+  qr_invert_prob: 0.10
+  qr_dark_range: [0, 120]
+  qr_light_range: [180, 255]
+  qr_perspective_range: [0.0, 0.35]
+  qr_rotation_range: [0, 360]
+
+  # Augmentations
+  glare_prob: 0.4
+  glare_radius_range: [20, 100]
+  glare_intensity_range: [0.1, 0.5]
+  
+  distortion_prob: 0.4
+  distortion_strength_range: [0.000001, 0.00001]
+  
+  noise_sigma_range: [5, 25]
+  blur_prob: 0.8
+  blur_kernels: [3, 13]
+  
+  downscale_prob: 0.5
+  downscale_factor_range: [0.4, 0.8]
+  
+  lighting_slope_range: [-0.004, 0.004]
+  lighting_base_range: [0.7, 1.3]
+
+  # Distractors
+  max_distractors: 3
+  distractor_type_split: 0.5
+  shipping_label_prob: 0.4
+  paper_noise_sigma: 5
+  distractor_tilt_max: 0.3
