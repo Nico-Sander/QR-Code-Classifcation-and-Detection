@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass
 class QRROIConfig:
     patch_size: int = 256
+    max_slidingwindow_size = 1280
     overlap: float = 0.5
     min_area: int = 500
     top_k: int = 50
@@ -45,19 +46,30 @@ def generate_patches(img, cand, cfg: QRROIConfig):
         patches.append(pad_and_crop(img, cand["cx"], cand["cy"], S))
     
     # Fall B: Groß -> Sliding Window
-    else:
-        stride = int(S * (1 - cfg.overlap))
+    else:   
+        W = cfg.max_slidingwindow_size
+        
+        if not(cand["w"] <= W and cand["h"] <= W):
+            max_size = max(cand["w"], cand["h"])
+            S = int(np.ceil(max_size / 5))
+
+        stride = max(1, int(S * (1 - cfg.overlap)))
         for y_s in range(cand["y"], cand["y"] + cand["h"] - S + stride, stride):
             for x_s in range(cand["x"], cand["x"] + cand["w"] - S + stride, stride):
                 # Wir berechnen die obere linke Ecke des Fensters
                 ax = min(x_s, cand["x"] + cand["w"] - S)
                 ay = min(y_s, cand["y"] + cand["h"] - S)
-                
+                    
                 # WICHTIG: Wir nutzen pad_and_crop mit dem Zentrum des Fensters,
                 # um sicherzustellen, dass das Bild niemals leer ist!
                 cx_patch = ax + S // 2
                 cy_patch = ay + S // 2
-                patches.append(pad_and_crop(img, cx_patch, cy_patch, S))
+
+                patch = pad_and_crop(img, cx_patch, cy_patch, S)
+                if S != 256:
+                    patch = cv2.resize(patch, (256, 256), interpolation=cv2.INTER_AREA)
+
+                patches.append(patch)
     return patches
 
 def detect_candidates(img, cfg: QRROIConfig):
@@ -65,7 +77,7 @@ def detect_candidates(img, cfg: QRROIConfig):
     avg_brightness = np.mean(gray)
     thresh_val = 100 if avg_brightness < 70 else 180
     
-    mask = cv2.threshold(gray, thresh_val, 255, cv2.THRESH_BINARY)
+    _, mask = cv2.threshold(gray, thresh_val, 255, cv2.THRESH_BINARY)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
     closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -108,7 +120,7 @@ def main(input_dir, output_dir="extraktion_ergebnis"):
             total_patches_for_image += len(roi_patches)
 
             for p_idx, patch in enumerate(roi_patches):
-                patch_name = f"{img_file.stem}_roi{i:02d}_p{p_idx:02d}.jpg"
+                patch_name = f"{img_file.stem}_roi{i:02d}_p{p_idx:02d}_0.jpg"
                 cv2.imwrite(str(out_patches / patch_name), patch)
 
             # Visualisierung zeichnen
@@ -125,7 +137,7 @@ def main(input_dir, output_dir="extraktion_ergebnis"):
                         ax, ay = min(xs, cand["x"] + cand["w"] - S), min(ys, cand["y"] + cand["h"] - S)
                         cv2.rectangle(display_img, (ax, ay), (ax + S, ay + S), (0, 0, 255), 1)
 
-        print(f"       -> Insgesamt {total_patches_for_image} Patches gespeichert.")
+        print(f"-> Insgesamt {total_patches_for_image} Patches gespeichert.")
 
         if cfg.debug_view and len(candidates) > 0:
             res_small = cv2.resize(display_img, (800, 600))
