@@ -12,6 +12,7 @@ data/
 │   ├── positive/   # Place real images containing QR codes here
 │   └── negative/   # Place real background images here
 └── backgrounds/    # Place full-size images without QR codes used for generating synthetic backgrounds
+```
 
 ### How to Generate the Dataset
 
@@ -24,6 +25,22 @@ data/
     ```bash
     python scripts/build_dataset.py
     ```
+
+## How to train a Model
+
+1. **Configure**: Open `config/model_config.yaml' and set your desired parameters
+
+2. **Run the Pipeline**:
+- run all the cells in the `notebooks/01_train_model.ipynb` notebook.
+
+3. The best and final model and the logging data will be saved to `runs/<model_name>` where the modelname can be specified in the config.
+
+4. **See interactive model parameters**:
+- run this command from the the root of the project:
+    ```bash
+    tensorboard --logdir runs
+    ```
+- then open http://localhost:6006 in your browser.
 
 ## Daten
 - ausgeglichene Anzahl Bilder mit und ohne QR Codes unter der Windschutzscheibe

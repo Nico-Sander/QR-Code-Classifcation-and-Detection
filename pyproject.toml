@@ -2,14 +2,18 @@
 name = "ki-project"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = [ 
-	"pandas",
-	"matplotlib", 
-	"scikit-learn", 
-	"opencv-python",
+dependencies = [
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "opencv-python",
     "numpy",
     "ipywidgets",
     "jupyterlab",
     "tqdm",
     "qrcode[pil]",
+    "tensorflow",
+    "PyYAML",
+    "pydot",
+    "graphviz",
 ]
