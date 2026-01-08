@@ -3,101 +3,105 @@ from tensorflow.keras import layers, models, Input, optimizers
 
 def build_model_from_config(config):
     """
-    Constructs a compiled Keras model based on the provided configuration dictionary.
+    Builds a Keras model based on the provided configuration dict.
     """
-    model_cfg = config['model']
-    train_cfg = config['train']
+    model_config = config['model']
+    input_shape = model_config['input_shape']
     
-    # 1. Input Layer
-    # We explicitly define input shape to catch dimension errors early
-    input_shape = tuple(model_cfg['input_shape'])
-    inputs = Input(shape=input_shape)
-    x = inputs
+    model = models.Sequential()
+    
+    # 1. Explicit Input Layer
+    model.add(layers.Input(shape=input_shape))
+    
+    # 2. Optional: Rescaling (Best practice to normalize inputs to 0-1)
+    # If your images are 0-255, this makes training much more stable.
+    # We add this check to be safe.
+    model.add(layers.Rescaling(1./255)) 
 
-    # 2. Iterate through layers defined in YAML
-    # This allows for arbitrary depths and architectures
-    for i, layer_def in enumerate(model_cfg['layers']):
-        l_type = layer_def['type'].lower()
-
-        # --- CONVOLUTIONAL LAYERS ---
-        if l_type == 'conv':
-            x = layers.Conv2D(
-                filters=layer_def['filters'],
-                kernel_size=layer_def['kernel_size'],
-                strides=layer_def.get('stride', 1),
-                padding=layer_def.get('padding', 'same'),
-                activation=layer_def.get('activation', 'relu'),
-                name=f"conv_{i}"
-            )(x)
+    # 3. Iterate through layers
+    for layer_cfg in model_config['layers']:
+        layer_type = layer_cfg['type']
+        
+        # --- PREPROCESSING / AUGMENTATION LAYERS ---
+        if layer_type == 'random_flip':
+            model.add(layers.RandomFlip(mode=layer_cfg['mode']))
             
-            if layer_def.get('batch_norm', False):
-                x = layers.BatchNormalization(name=f"bn_{i}")(x)
-
-        # --- POOLING LAYERS ---
-        elif l_type == 'max_pool':
-            x = layers.MaxPooling2D(
-                pool_size=layer_def.get('pool_size', 2),
-                name=f"max_pool_{i}"
-            )(x)
+        elif layer_type == 'random_rotation':
+            model.add(layers.RandomRotation(factor=layer_cfg['factor']))
             
-        elif l_type == 'avg_pool':
-            x = layers.AveragePooling2D(
-                pool_size=layer_def.get('pool_size', 2),
-                name=f"avg_pool_{i}"
-            )(x)
-
-        elif l_type == 'global_avg_pool':
-            x = layers.GlobalAveragePooling2D(name=f"global_avg_{i}")(x)
-
-        # --- FLATTEN / RESHAPE ---
-        elif l_type == 'flatten':
-            x = layers.Flatten(name=f"flatten_{i}")(x)
-
-        # --- DENSE LAYERS ---
-        elif l_type == 'dense':
-            x = layers.Dense(
-                units=layer_def['units'],
-                activation=layer_def.get('activation', 'relu'),
-                name=f"dense_{i}"
-            )(x)
+        elif layer_type == 'random_zoom':
+            model.add(layers.RandomZoom(
+                height_factor=layer_cfg['height_factor'], 
+                width_factor=layer_cfg['width_factor']
+            ))
             
-            if layer_def.get('batch_norm', False):
-                x = layers.BatchNormalization(name=f"bn_dense_{i}")(x)
-
-        # --- REGULARIZATION ---
-        elif l_type == 'dropout':
-            x = layers.Dropout(
-                rate=layer_def['rate'],
-                name=f"dropout_{i}"
-            )(x)
+        elif layer_type == 'random_translation':
+            model.add(layers.RandomTranslation(
+                height_factor=layer_cfg['height_factor'], 
+                width_factor=layer_cfg['width_factor']
+            ))
+            
+        elif layer_type == 'gaussian_noise':
+            # Adds noise to inputs (simulates grain/artifacts)
+            model.add(layers.GaussianNoise(stddev=layer_cfg['stddev']))
+            
+        elif layer_type == 'random_contrast':
+            model.add(layers.RandomContrast(factor=layer_cfg['factor']))
+            
+        # --- STANDARD CNN LAYERS ---
+        elif layer_type == 'conv':
+            model.add(layers.Conv2D(
+                filters=layer_cfg['filters'],
+                kernel_size=layer_cfg['kernel_size'],
+                strides=layer_cfg.get('stride', 1), # Default to 1 if not specified
+                padding=layer_cfg.get('padding', 'same'),
+                activation=layer_cfg['activation']
+            ))
+            if layer_cfg.get('batch_norm', False):
+                model.add(layers.BatchNormalization())
+                
+        elif layer_type == 'max_pool':
+            model.add(layers.MaxPooling2D(pool_size=layer_cfg['pool_size']))
+            
+        elif layer_type == 'avg_pool':
+            model.add(layers.AveragePooling2D(pool_size=layer_cfg['pool_size']))
+            
+        elif layer_type == 'global_avg_pool':
+            model.add(layers.GlobalAveragePooling2D())
+            
+        elif layer_type == 'flatten':
+            model.add(layers.Flatten())
+            
+        elif layer_type == 'dense':
+            model.add(layers.Dense(
+                units=layer_cfg['units'],
+                activation=layer_cfg['activation']
+            ))
+            
+        elif layer_type == 'dropout':
+            model.add(layers.Dropout(rate=layer_cfg['rate']))
             
         else:
-            print(f"⚠️ Warning: Unknown layer type '{l_type}' at index {i}. Skipping.")
+            print(f"⚠️ Warning: Unknown layer type '{layer_type}' skipped.")
 
-    # 3. Create Model Object
-    model = models.Model(inputs=inputs, outputs=x, name=config['project']['run_name'])
-
-    # 4. Compile Model
-    # We dynamically select the optimizer based on the string name
-    opt_name = train_cfg['optimizer'].lower()
-    lr = train_cfg['learning_rate']
-
+    # 4. Compile the model
+    # We compile here so the notebook stays clean
+    opt_name = config['train']['optimizer']
+    learning_rate = config['train']['learning_rate']
+    
     if opt_name == 'adam':
-        opt = optimizers.Adam(learning_rate=lr)
-    elif opt_name == 'sgd':
-        opt = optimizers.SGD(learning_rate=lr)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     elif opt_name == 'rmsprop':
-        opt = optimizers.RMSprop(learning_rate=lr)
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
     else:
-        print(f"⚠️ Warning: Unknown optimizer '{opt_name}'. Defaulting to Adam.")
-        opt = optimizers.Adam(learning_rate=lr)
-
+        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+        
     model.compile(
-        optimizer=opt,
-        loss=train_cfg['loss'],
-        metrics=train_cfg['metrics']
+        optimizer=optimizer,
+        loss=config['train']['loss'],
+        metrics=config['train']['metrics']
     )
-
+    
     return model
 
 if __name__ == "__main__":
