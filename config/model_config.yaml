@@ -1,6 +1,6 @@
 project:
   name: "qr_classifier"
-  run_name: "run_05_gentler_augmentation"
+  run_name: "run_06_dataset_improvements_metrics"
   seed: 42
 
 data:
@@ -15,9 +15,7 @@ model:
   input_shape: [256, 256, 1]
   
   layers:
-    # --- ONLINE DATA AUGMENTATION (GPU) ---
-    # These run only during training.
-    
+    ### --- Data Augmentation ---  
     # 1. Geometry (Spatial Robustness)
     - type: "random_flip"
       mode: "horizontal_and_vertical"
@@ -25,7 +23,7 @@ model:
     - type: "random_rotation"
       factor: 0.1
 
-    # 3. Artifacts & Quality (Texture Robustness)
+    # 2. Artifacts & Quality (Texture Robustness)
     # Adds random grain/static. Simulates "dots/artifacts".
     - type: "gaussian_noise"
       stddev: 0.025   # Amount of noise (0.1 is moderate grain)
@@ -36,7 +34,6 @@ model:
       factor: 0.1
 
     # --- DEEP CNN ARCHITECTURE ---
-    # (Same as Iteration 3)
     
     # Block 1
     - type: "conv"
@@ -107,7 +104,7 @@ train:
   learning_rate: 0.0005
   optimizer: "adam"
   loss: "binary_crossentropy"
-  metrics: ["accuracy"]
+  metrics: ["accuracy", "Precision", "Recall"]
   
   callbacks:
     early_stopping_patience: 10
@@ -116,5 +113,4 @@ train:
     use_lr_scheduler: true
     reduce_lr_patience: 4
     reduce_lr_factor: 0.5
-    reduce_lr_min: 0.0000010.5)
     reduce_lr_min: 0.000001     # Don't go below this value

@@ -9,6 +9,7 @@ from tqdm import tqdm
 sys.path.append(str(Path(__file__).parent))
 
 import training_data_generator
+from remove_duplicates import DuplicateCleaner
 from project_paths import ROOT_DIR, CONFIG_DIR, resolve_path
 
 def load_config(path):
@@ -37,14 +38,29 @@ def main():
     raw_synth = resolve_path(cfg_paths['raw_synthetic'])
     processed_dir = resolve_path(cfg_paths['processed'])
 
-    # 3. Analyze Real Data
-    print("\n📊 1. Analyzing Real Data...")
+    # 3. Deduplication
+    if config.get('deduplication', {}).get('enabled', False):
+        print("\n🕵️  1. Checking for Duplicates (Interactive)...")
+        trash_dir = resolve_path(config['deduplication']['trash_dir'])
+        threshold = config['deduplication']['threshold']
+        
+        cleaner = DuplicateCleaner(trash_dir, threshold)
+        
+        # Check Positives
+        cleaner.process_directory(raw_real / "positive")
+        # Check Negatives
+        cleaner.process_directory(raw_real / "negative")
+    else:
+        print("\n⏭️  1. Deduplication skipped (disabled in config).")
+
+    # 4. Analyze Real Data
+    print("\n📊 2. Analyzing Real Data...")
     real_pos_count = count_images(raw_real / "positive")
     real_neg_count = count_images(raw_real / "negative")
     print(f"   Found Real Pos: {real_pos_count}")
     print(f"   Found Real Neg: {real_neg_count}")
 
-    # 4. Calculate Requirements
+    # 5. Calculate Requirements
     total_target = cfg_data['total_images']
     pos_ratio = cfg_data['positive_ratio']
     
@@ -54,13 +70,13 @@ def main():
     needed_syn_pos = max(0, target_pos - real_pos_count)
     needed_syn_neg = max(0, target_neg - real_neg_count)
 
-    print("\n🧮 2. Dataset Plan:")
+    print("\n🧮 3. Dataset Plan:")
     print(f"   Target Total: {total_target}")
     print(f"   Positives: {target_pos} (Real: {real_pos_count} + Synthetic Needed: {needed_syn_pos})")
     print(f"   Negatives: {target_neg} (Real: {real_neg_count} + Synthetic Needed: {needed_syn_neg})")
 
-    # 5. Generate Synthetic Data
-    print("\n🏭 3. Synthetic Generation Phase...")
+    # 6. Generate Synthetic Data
+    print("\n🏭 4. Synthetic Generation Phase...")
     training_data_generator.generate_synthetic_data(
         config=config, 
         output_dir=raw_synth,
@@ -68,8 +84,8 @@ def main():
         num_negatives=needed_syn_neg
     )
 
-    # 6. Build Final Processed Dataset
-    print("\n📦 4. Assembling Final Dataset...")
+    # 7. Build Final Processed Dataset
+    print("\n📦 5. Assembling Final Dataset...")
     if processed_dir.exists():
         shutil.rmtree(processed_dir)
     
@@ -114,14 +130,14 @@ def main():
             except Exception as e:
                 print(f"Error: {e}")
 
-    # 7. Cleanup Phase
+    # 8. Cleanup Phase
     if cfg_data.get('cleanup_intermediate', False):
-        print("\n🧹 5. Cleaning up intermediate synthetic data...")
+        print("\n🧹 6. Cleaning up intermediate synthetic data...")
         if raw_synth.exists():
             shutil.rmtree(raw_synth)
             print(f"   Deleted {raw_synth} to save space.")
     else:
-        print("\n✨ 5. Intermediate data preserved for faster re-runs.")
+        print("\n✨ 6. Intermediate data preserved for faster re-runs.")
 
     print(f"\n✅ Pipeline Complete! Final dataset in {processed_dir}")
 
