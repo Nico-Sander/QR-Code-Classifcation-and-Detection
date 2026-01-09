@@ -13,7 +13,11 @@ paths:
   backgrounds: "data/backgrounds"
   processed: "data/processed_patches"
 
-# All generator constants are now here
+deduplication:
+  enabled: true       # Set to false to skip this step during automated runs
+  threshold: 7        # Hamming distance (User selected)
+  trash_dir: "data/duplicates"
+
 generation:
   # Visibility & Placement
   min_visible_percent: 0.6

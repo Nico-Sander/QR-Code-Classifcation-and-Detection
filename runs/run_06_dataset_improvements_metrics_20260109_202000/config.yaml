@@ -1,0 +1,116 @@
+project:
+  name: "qr_classifier"
+  run_name: "run_06_dataset_improvements_metrics"
+  seed: 42
+
+data:
+  dataset_path: "data/processed_patches"
+  img_height: 256
+  img_width: 256
+  channels: 1
+  batch_size: 64
+  validation_split: 0.2
+
+model:
+  input_shape: [256, 256, 1]
+  
+  layers:
+    ### --- Data Augmentation ---  
+    # 1. Geometry (Spatial Robustness)
+    - type: "random_flip"
+      mode: "horizontal_and_vertical"
+      
+    - type: "random_rotation"
+      factor: 0.1
+
+    # 2. Artifacts & Quality (Texture Robustness)
+    # Adds random grain/static. Simulates "dots/artifacts".
+    - type: "gaussian_noise"
+      stddev: 0.025   # Amount of noise (0.1 is moderate grain)
+
+    # Changes contrast. Simulates "Blur" or bad lighting
+    # by reducing the sharpness of edges.
+    - type: "random_contrast"
+      factor: 0.1
+
+    # --- DEEP CNN ARCHITECTURE ---
+    
+    # Block 1
+    - type: "conv"
+      filters: 32
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 2
+    - type: "conv"
+      filters: 64
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 3
+    - type: "conv"
+      filters: 128
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 4
+    - type: "conv"
+      filters: 128
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 5
+    - type: "conv"
+      filters: 128
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Classifier Head
+    - type: "flatten"
+    
+    - type: "dense"
+      units: 64
+      activation: "relu"
+      
+    - type: "dropout"
+      rate: 0.5
+
+    - type: "dense"
+      units: 1
+      activation: "sigmoid"
+
+train:
+  epochs: 50
+  learning_rate: 0.0005
+  optimizer: "adam"
+  loss: "binary_crossentropy"
+  metrics: ["accuracy", "Precision", "Recall"]
+  
+  callbacks:
+    early_stopping_patience: 10
+    save_best_only: true
+    
+    use_lr_scheduler: true
+    reduce_lr_patience: 4
+    reduce_lr_factor: 0.5
+    reduce_lr_min: 0.000001     # Don't go below this value
