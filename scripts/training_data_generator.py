@@ -66,7 +66,7 @@ class SyntheticGenerator:
         
         map_x = center_x + delta_x / factor
         map_y = center_y + delta_y / factor
-        return cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR)
+        return cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
 
     def add_noise_and_blur(self, image):
         img_float = image.astype(np.float32)
@@ -100,6 +100,9 @@ class SyntheticGenerator:
         c = random.uniform(base_range[0], base_range[1])
         
         lighting = a * X + b * Y + c
+
+        lighting = np.maximum(lighting, 0.2)
+
         return np.clip(image.astype(np.float32) * lighting, 0, 255).astype(np.uint8)
 
     def process_final_image(self, image):
@@ -116,17 +119,43 @@ class SyntheticGenerator:
         if self.bg_files:
             fname = random.choice(self.bg_files)
             img = cv2.imread(str(fname), cv2.IMREAD_GRAYSCALE)
+            
             if img is not None:
                 h, w = img.shape
-                if h > self.img_size and w > self.img_size:
-                    y = random.randint(0, h - self.img_size)
-                    x = random.randint(0, w - self.img_size)
-                    bg = img[y:y+self.img_size, x:x+self.img_size]
-                else:
-                    bg = cv2.resize(img, (self.img_size, self.img_size))
-                return bg
+                
+                # 1. Define bounds
+                # We want a patch between 128x128 and 512x512
+                target_min = 128
+                target_max = 512
+                
+                # 2. Safety Check
+                # We can't crop 512px from a 300px image. 
+                # So the max crop is limited by the actual image dimensions.
+                limit = min(h, w)
+                
+                if limit < target_min:
+                    # Image is too tiny (e.g. 64x64). Just stretch the whole thing.
+                    return cv2.resize(img, (self.img_size, self.img_size))
+                
+                # Calculate the effective max for this specific image
+                effective_max = min(target_max, limit)
+                
+                # 3. Random Selection
+                # Pick a random square size (e.g., 150 or 400)
+                crop_size = random.randint(target_min, effective_max)
+                
+                # Pick a random position
+                y = random.randint(0, h - crop_size)
+                x = random.randint(0, w - crop_size)
+                
+                # 4. Crop & Resize
+                # If crop_size < 256 -> Scipy/CV2 scales UP (Zoom In)
+                # If crop_size > 256 -> Scipy/CV2 scales DOWN (Zoom Out)
+                crop = img[y:y+crop_size, x:x+crop_size]
+                
+                return cv2.resize(crop, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
         
-        # Fallback to Synthetic Noise
+        # Fallback to Synthetic Noise if no background files found or load failed
         bg = np.random.randint(50, 200, (self.img_size, self.img_size), dtype=np.uint8)
         return cv2.GaussianBlur(bg, (55, 55), 0)
 
@@ -141,13 +170,21 @@ class SyntheticGenerator:
         
         dark_range = self.cfg['qr_dark_range']
         light_range = self.cfg['qr_light_range']
+       
+        while True:
+            val_dark = random.randint(dark_range[0], dark_range[1])
+            val_light = random.randint(light_range[0], light_range[1])
+            
+            # Ensure at least 50 brightness difference
+            if (val_light - val_dark) > 50:
+                break
 
-        if random.random() > self.cfg['qr_invert_prob']:
-            v1 = random.randint(dark_range[0], dark_range[1])
-            v2 = random.randint(light_range[0], light_range[1])
+        if random.random() < self.cfg['qr_invert_prob']:
+            v1 = val_light
+            v2 = val_dark
         else:
-            v1 = random.randint(light_range[0], light_range[1])
-            v2 = random.randint(dark_range[0], dark_range[1])
+            v1 = val_dark
+            v2 = val_light
             
         colored_qr = np.where(img_arr == 0, v1, v2).astype(np.uint8)
         mask = np.full_like(colored_qr, 255)
