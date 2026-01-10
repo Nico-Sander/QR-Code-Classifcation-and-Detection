@@ -5,11 +5,12 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 
-# Add current directory to path to find sibling modules
+# Add current directory to path
 sys.path.append(str(Path(__file__).parent))
 
 import training_data_generator
 from remove_duplicates import DuplicateCleaner
+from verify_dataset import DatasetVerifier 
 from project_paths import ROOT_DIR, CONFIG_DIR, resolve_path
 
 def load_config(path):
@@ -25,42 +26,58 @@ def count_images(directory):
 def main():
     # 1. Load Configuration
     config_path = CONFIG_DIR / "dataset_config.yaml"
-    
     config = load_config(config_path)
     cfg_data = config['dataset']
     cfg_paths = config['paths']
 
     print(f"🚀 Starting Pipeline: {config['project_name']}")
-    print(f"   Project Root: {ROOT_DIR}")
 
-    # 2. Resolve Paths Smartly
     raw_real = resolve_path(cfg_paths['raw_real'])
     raw_synth = resolve_path(cfg_paths['raw_synthetic'])
     processed_dir = resolve_path(cfg_paths['processed'])
+    misclassified_dir = resolve_path(cfg_paths['misclassified']) # From updated config
 
-    # 3. Deduplication
+    # --- PHASE 1: DEDUPLICATION ---
     if config.get('deduplication', {}).get('enabled', False):
         print("\n🕵️  1. Checking for Duplicates (Interactive)...")
         trash_dir = resolve_path(config['deduplication']['trash_dir'])
-        threshold = config['deduplication']['threshold']
-        
-        cleaner = DuplicateCleaner(trash_dir, threshold)
-        
-        # Check Positives
+        cleaner = DuplicateCleaner(trash_dir, config['deduplication']['threshold'])
         cleaner.process_directory(raw_real / "positive")
-        # Check Negatives
         cleaner.process_directory(raw_real / "negative")
     else:
-        print("\n⏭️  1. Deduplication skipped (disabled in config).")
+        print("\n⏭️  1. Deduplication skipped.")
 
-    # 4. Analyze Real Data
-    print("\n📊 2. Analyzing Real Data...")
+    # --- PHASE 2: VERIFY REAL DATA (Cleaning Source) ---
+    print("\n🧠 2. Verifying Real Data Integrity...")
+    verifier = DatasetVerifier(config, trash_root=misclassified_dir)
+    
+    real_dirs = [
+        (raw_real / "positive", "pos"),
+        (raw_real / "negative", "neg")
+    ]
+    
+    for r_dir, label in real_dirs:
+        if not r_dir.exists(): continue
+        files = sorted(list(r_dir.glob("*")))
+        
+        # Use a manual loop index so we can handle file moves safely
+        print(f"   Checking {label} images in {r_dir.name}...")
+        cleaned_count = 0
+        for fpath in tqdm(files):
+            # verify_and_move returns False if the user discards (moves) the file
+            keep = verifier.verify_and_move(fpath, label)
+            if not keep:
+                cleaned_count += 1
+        
+        if cleaned_count > 0:
+            print(f"   ⚠️  Moved {cleaned_count} misclassified images to {misclassified_dir}")
+
+    # --- PHASE 3: CALCULATE REQUIREMENTS ---
+    print("\n📊 3. Calculating Dataset Balance...")
+    # Now we count ONLY the files that survived verification
     real_pos_count = count_images(raw_real / "positive")
     real_neg_count = count_images(raw_real / "negative")
-    print(f"   Found Real Pos: {real_pos_count}")
-    print(f"   Found Real Neg: {real_neg_count}")
-
-    # 5. Calculate Requirements
+    
     total_target = cfg_data['total_images']
     pos_ratio = cfg_data['positive_ratio']
     
@@ -70,13 +87,13 @@ def main():
     needed_syn_pos = max(0, target_pos - real_pos_count)
     needed_syn_neg = max(0, target_neg - real_neg_count)
 
-    print("\n🧮 3. Dataset Plan:")
-    print(f"   Target Total: {total_target}")
-    print(f"   Positives: {target_pos} (Real: {real_pos_count} + Synthetic Needed: {needed_syn_pos})")
-    print(f"   Negatives: {target_neg} (Real: {real_neg_count} + Synthetic Needed: {needed_syn_neg})")
+    print(f"   Real Pos: {real_pos_count} | Need Synthetic: {needed_syn_pos}")
+    print(f"   Real Neg: {real_neg_count} | Need Synthetic: {needed_syn_neg}")
 
-    # 6. Generate Synthetic Data
-    print("\n🏭 4. Synthetic Generation Phase...")
+    # --- PHASE 4: GENERATE & VERIFY SYNTHETIC ---
+    print("\n🏭 4. Generating & Verifying Synthetic Data...")
+    
+    # Generate the batch
     training_data_generator.generate_synthetic_data(
         config=config, 
         output_dir=raw_synth,
@@ -84,7 +101,31 @@ def main():
         num_negatives=needed_syn_neg
     )
 
-    # 7. Build Final Processed Dataset
+    # Immediately verify the NEW synthetic data
+    # We verify the raw_synthetic folder now
+    syn_dirs = [
+        (raw_synth / "positive", "pos"),
+        (raw_synth / "negative", "neg")
+    ]
+
+    for s_dir, label in syn_dirs:
+        if not s_dir.exists(): continue
+        files = sorted(list(s_dir.glob("*.png"))) 
+        
+        # Only check the newly generated ones if you want to save time, 
+        # but checking all in that folder ensures consistency.
+        print(f"   Verifying synthetic {label} quality...")
+        bad_syn_count = 0
+        for fpath in tqdm(files):
+            # If user discards synthetic, we move it to misclassified too (or you could just delete)
+            keep = verifier.verify_and_move(fpath, label)
+            if not keep:
+                bad_syn_count += 1
+        
+        if bad_syn_count > 0:
+             print(f"   ✂️  Pruned {bad_syn_count} bad synthetic images.")
+
+    # --- PHASE 5: ASSEMBLY ---
     print("\n📦 5. Assembling Final Dataset...")
     if processed_dir.exists():
         shutil.rmtree(processed_dir)
@@ -92,11 +133,12 @@ def main():
     (processed_dir / "positive").mkdir(parents=True)
     (processed_dir / "negative").mkdir(parents=True)
 
+    # Re-list files because some might have been moved during verification
     sources = [
-        {"path": raw_real / "positive", "origin": "real", "label": "pos", "dest": processed_dir / "positive"},
-        {"path": raw_real / "negative", "origin": "real", "label": "neg", "dest": processed_dir / "negative"},
-        {"path": raw_synth / "positive", "origin": "syn",  "label": "pos", "dest": processed_dir / "positive"},
-        {"path": raw_synth / "negative", "origin": "syn",  "label": "neg", "dest": processed_dir / "negative"},
+        {"path": raw_real / "positive", "dest": processed_dir / "positive"},
+        {"path": raw_real / "negative", "dest": processed_dir / "negative"},
+        {"path": raw_synth / "positive", "dest": processed_dir / "positive"},
+        {"path": raw_synth / "negative", "dest": processed_dir / "negative"},
     ]
 
     img_size = (cfg_data['img_size'], cfg_data['img_size'])
@@ -104,20 +146,11 @@ def main():
     for src in sources:
         if not src["path"].exists(): continue
         
-        # Sort files to ensure the same subset is picked every time
-        all_files = sorted(list(src["path"].glob("*")))
+        # We take everything that currently exists in the folders 
+        # (since we already cleaned them)
+        files = sorted(list(src["path"].glob("*")))
         
-        if src["origin"] == "syn":
-            limit = needed_syn_pos if src["label"] == "pos" else needed_syn_neg
-            files_to_process = all_files[:limit]
-            
-            if len(all_files) > limit:
-                print(f"   Note: Reusing {limit} of {len(all_files)} available synthetic {src['label']} images.")
-        else:
-            files_to_process = all_files
-
-        desc = f"Processing {src['origin']}_{src['label']}"
-        for fpath in tqdm(files_to_process, desc=desc):
+        for fpath in tqdm(files, desc=f"Copying {src['path'].name}"):
             try:
                 img = cv2.imread(str(fpath), cv2.IMREAD_GRAYSCALE)
                 if img is None: continue
@@ -125,21 +158,16 @@ def main():
                 if img.shape != img_size:
                     img = cv2.resize(img, img_size)
                 
-                fname = f"{src['origin']}_{src['label']}_{fpath.stem}.png"
+                # Prefix filename with origin type to avoid collisions
+                origin_prefix = "real" if "real" in str(src["path"]) else "syn"
+                label_prefix = "pos" if "positive" in str(src["path"]) else "neg"
+                fname = f"{origin_prefix}_{label_prefix}_{fpath.name}"
+                
                 cv2.imwrite(str(src["dest"] / fname), img)
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"Error copying {fpath}: {e}")
 
-    # 8. Cleanup Phase
-    if cfg_data.get('cleanup_intermediate', False):
-        print("\n🧹 6. Cleaning up intermediate synthetic data...")
-        if raw_synth.exists():
-            shutil.rmtree(raw_synth)
-            print(f"   Deleted {raw_synth} to save space.")
-    else:
-        print("\n✨ 6. Intermediate data preserved for faster re-runs.")
-
-    print(f"\n✅ Pipeline Complete! Final dataset in {processed_dir}")
+    print(f"\n✅ Pipeline Complete! Clean dataset in {processed_dir}")
 
 if __name__ == "__main__":
     main()
