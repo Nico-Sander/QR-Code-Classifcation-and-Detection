@@ -12,11 +12,17 @@ paths:
   raw_synthetic: "data/synthetic_patches"
   backgrounds: "data/backgrounds"
   processed: "data/processed_patches"
+  misclassified: "data/misclassified"
 
 deduplication:
-  enabled: true       # Set to false to skip this step during automated runs
+  enabled: false       # Set to false to skip this step during automated runs
   threshold: 7        # Hamming distance (User selected)
   trash_dir: "data/duplicates"
+
+verification:
+  enabled: true
+  suspicious_pos_threshold: 0.5  # Flag REAL POSITIVES if model is < 20% sure it's a QR
+  suspicious_neg_threshold: 0.5  # Flag REAL NEGATIVES if model is > 50% sure it's a QR
 
 generation:
   # Visibility & Placement
