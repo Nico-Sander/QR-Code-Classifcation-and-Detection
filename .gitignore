@@ -208,3 +208,11 @@ __marimo__/
 
 # Data
 data/
+
+tmp_matplotlib_cache
+
+# Modeltryout
+test_patches/
+test_picture/
+final_results/
+heatmaps_output/
