@@ -6,7 +6,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "scikit-learn",
-    "numpy",
+    "numpy<2.0",
     "ipywidgets",
     "jupyterlab",
     "tqdm",
@@ -18,6 +18,7 @@ dependencies = [
     "ImageHash",
     "PyQt6",
     "pyzbar>=0.1.9",
-    "opencv-contrib-python>=4.13.0.90",
+    "opencv-contrib-python<4.10",
     "requests>=2.32.5",
+    "qreader>=3.16",
 ]
