@@ -1,0 +1,64 @@
+\babel@toc {ngerman}{}\relax 
+\contentsline {section}{\numberline {1}Einleitung}{4}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Aufgabenstellung}{4}{subsection.1.1}%
+\contentsline {subsubsection}{\numberline {1.1.1}Klassifikation}{4}{subsubsection.1.1.1}%
+\contentsline {subsubsection}{\numberline {1.1.2}Detektion, Decodierung und geometrische Analyse}{4}{subsubsection.1.1.2}%
+\contentsline {subsection}{\numberline {1.2}Herausforderungen}{4}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Ansatz}{5}{subsection.1.3}%
+\contentsline {subsubsection}{\numberline {1.3.1}Sliding Window Verfahren und Auflösungsunabhängigkeit}{5}{subsubsection.1.3.1}%
+\contentsline {subsubsection}{\numberline {1.3.2}Skalenunabhängigkeit (Multi-Scale Ansatz)}{5}{subsubsection.1.3.2}%
+\contentsline {subsubsection}{\numberline {1.3.3}Verbindung von Klassifikation und Detektion}{6}{subsubsection.1.3.3}%
+\contentsline {section}{\numberline {2}Daten}{7}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Datenerhebung}{7}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Vorverarbeitung \& Labeling}{7}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Datenaugmentation}{7}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Finaler Datensatz}{7}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Netzarchitekturen}{7}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Experimentelle Entwicklung}{7}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Finales Modell}{7}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Transfer Learning}{7}{section.4}%
+\contentsline {subsection}{\numberline {4.1}MobileNetV3Small}{7}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}Experimentelle Entwicklung}{7}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}Finales Modell}{7}{subsubsection.4.1.2}%
+\contentsline {subsection}{\numberline {4.2}MobileNetV2}{7}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}Experimentelle Entwicklung}{7}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}Finales Modell}{7}{subsubsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.3}EfficientNetB0}{7}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}Experimentelle Entwicklung}{7}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4.3.2}Finales Modell}{7}{subsubsection.4.3.2}%
+\contentsline {section}{\numberline {5}Inferenz}{7}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Vorverarbeitung: Multi-Scale Sliding Window}{8}{subsection.5.1}%
+\contentsline {subsubsection}{\numberline {5.1.1}Implementierung und Konfiguration}{8}{subsubsection.5.1.1}%
+\contentsline {subsubsection}{\numberline {5.1.2}Analyse der Einstellparameter}{9}{subsubsection.5.1.2}%
+\contentsline {subsubsection}{\numberline {5.1.3}Normalisierung und mathematische Zusammenhänge}{10}{subsubsection.5.1.3}%
+\contentsline {subsection}{\numberline {5.2}Modelldurchlauf}{10}{subsection.5.2}%
+\contentsline {subsubsection}{\numberline {5.2.1}Datenvorbereitung und Farbraumanpassung}{11}{subsubsection.5.2.1}%
+\contentsline {subsubsection}{\numberline {5.2.2}Batch-Verarbeitung und VRAM-Management}{11}{subsubsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.3}Heatmap Erstellung}{11}{subsection.5.3}%
+\contentsline {subsubsection}{\numberline {5.3.1}Das Voting-Prinzip der Wahrscheinlichkeits-Akkumulation}{12}{subsubsection.5.3.1}%
+\contentsline {subsubsection}{\numberline {5.3.2}Konfigurationsparameter und Visualisierung}{12}{subsubsection.5.3.2}%
+\contentsline {subsubsection}{\numberline {5.3.3}Visualisierung und Normierung (\texttt {fixed\_vis\_max})}{13}{subsubsection.5.3.3}%
+\contentsline {subsection}{\numberline {5.4}Finale Entscheidung und Lokalisierung}{14}{subsection.5.4}%
+\contentsline {subsubsection}{\numberline {5.4.1}Binarisierung: Trennung von Signal und Rauschen}{14}{subsubsection.5.4.1}%
+\contentsline {subsubsection}{\numberline {5.4.2}Lokalisierung und geometrische Plausibilitätsprüfung}{14}{subsubsection.5.4.2}%
+\contentsline {subsubsection}{\numberline {5.4.3}Visualisierung der Detektion}{14}{subsubsection.5.4.3}%
+\contentsline {subsubsection}{\numberline {5.4.4}Visuelle Ergebniskontrolle: Das Evaluations-Dashboard}{15}{subsubsection.5.4.4}%
+\contentsline {section}{\numberline {6}Entschlüsselung der QR-Codes}{17}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Aufgabe und Herausforderungen}{17}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Methodik: Detaillierte Analyse der Dekodierungsansätze}{18}{subsection.6.2}%
+\contentsline {subsubsection}{\numberline {6.2.1}Ansatz 1: Pixel-basierte Bildrestaurierung (Robust Restored)}{18}{subsubsection.6.2.1}%
+\contentsline {subsubsection}{\numberline {6.2.2}Ansatz 2: Räumliche Redundanz (Smart Tiling)}{19}{subsubsection.6.2.2}%
+\contentsline {subsubsection}{\numberline {6.2.3}Ansatz 3: KI-basierte Detektion und Rektifizierung (QReader)}{19}{subsubsection.6.2.3}%
+\contentsline {subsection}{\numberline {6.3}Finale Entscheidung}{20}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Verarbeitung multipler QR-Codes und Ergebnissicherung}{20}{subsection.6.4}%
+\contentsline {subsubsection}{\numberline {6.4.1}Iterative Abarbeitung und logische Zusammenführung}{21}{subsubsection.6.4.1}%
+\contentsline {subsubsection}{\numberline {6.4.2}Visualisierung und Nutzerfeedback}{21}{subsubsection.6.4.2}%
+\contentsline {subsubsection}{\numberline {6.4.3}Datensicherung und Log-File-Struktur}{21}{subsubsection.6.4.3}%
+\contentsline {section}{\numberline {7}Geometrische Analyse und Winkelberechnung}{22}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Methodik: Pose Estimation via SolvePnP}{22}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Differenzierung der Winkel-Kategorien}{22}{subsection.7.2}%
+\contentsline {subsubsection}{\numberline {7.2.1}Der relative Tilt-Winkel (Bildspezifische Messung)}{23}{subsubsection.7.2.1}%
+\contentsline {subsubsection}{\numberline {7.2.2}Der absolute Montage-Winkel (Systemweite Empfehlung)}{23}{subsubsection.7.2.2}%
+\contentsline {subsection}{\numberline {7.3}Statistische Auswertung und Ergebnisse}{23}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Wissenschaftliche Begründung der Montageempfehlung}{24}{subsection.7.4}%
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
