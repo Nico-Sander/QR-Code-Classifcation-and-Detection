@@ -1,0 +1,104 @@
+# Project Settings
+project:
+  name: "qr_classifier"
+  run_name: "run_03_deep_cnn_flatten"
+  seed: 42
+
+# Dataset Settings
+data:
+  dataset_path: "data/processed_patches"
+  img_height: 256
+  img_width: 256
+  channels: 1
+  batch_size: 32
+  validation_split: 0.2
+
+# Model Architecture
+model:
+  input_shape: [256, 256, 1]
+  type: "custom"  # Triggers custom layer iteration in parser
+
+  layers:
+    # --- CNN Blocks ---
+    # Block 1
+    - type: "conv"
+      filters: 32
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 2
+    - type: "conv"
+      filters: 64
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 3
+    - type: "conv"
+      filters: 128
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 4
+    - type: "conv"
+      filters: 128
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # Block 5
+    - type: "conv"
+      filters: 128
+      kernel_size: 3
+      padding: "same"
+      activation: "relu"
+      batch_norm: true
+    - type: "max_pool"
+      pool_size: 2
+
+    # --- Classifier Head ---
+    # Using Flatten instead of Global Avg Pool
+    - type: "flatten"
+
+    - type: "dense"
+      units: 64
+      activation: "relu"
+
+    - type: "dropout"
+      rate: 0.5
+
+    - type: "dense"
+      units: 1
+      activation: "sigmoid"
+
+# Training Hyperparameters
+train:
+  epochs: 50
+  learning_rate: 0.0005
+  optimizer: "adam"
+  loss: "binary_crossentropy"
+  metrics: ["accuracy"]
+
+  callbacks:
+    early_stopping_patience: 8
+    save_best_only: true
+
+    # LR Scheduler settings
+    use_lr_scheduler: true
+    reduce_lr_patience: 3
+    reduce_lr_factor: 0.5
+    reduce_lr_min: 0.000001

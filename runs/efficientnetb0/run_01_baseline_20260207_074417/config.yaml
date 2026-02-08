@@ -1,0 +1,73 @@
+# Project Settings
+project:
+  name: "qr_classifier"
+  run_name: "run_01_baseline"
+  seed: 42
+
+# Dataset Settings
+data:
+  dataset_path: "data/processed_patches"
+  img_height: 256
+  img_width: 256
+  channels: 1
+  batch_size: 32     # Batch size is 32 for this run
+  validation_split: 0.2
+
+# Model Architecture
+model:
+  input_shape: [256, 256, 1]
+  type: "transfer" # Triggers transfer logic in parser
+
+  # Transfer Learning Settings
+  transfer:
+    base_model: "EfficientNetB0"   # Using EfficientNetB0
+    freeze_base: false             # Base model weights WILL be retrained
+
+  layers:
+    ### --- Data Augmentation ---
+    # Phase 1: Applied to raw input
+    - type: "random_flip"
+      mode: "horizontal_and_vertical"
+      
+    - type: "random_rotation"
+      factor: 0.1
+
+    - type: "gaussian_noise"
+      stddev: 0.025
+
+    - type: "random_contrast"
+      factor: 0.1
+
+    ### --- Classifier Head ---
+    # Phase 3: Added after the base model
+    # Intermediate CNN blocks removed as they are ignored in transfer mode
+    
+    - type: "global_avg_pool"
+    
+    - type: "dense"
+      units: 64
+      activation: "relu"
+      
+    - type: "dropout"
+      rate: 0.5
+
+    - type: "dense"
+      units: 1
+      activation: "sigmoid"
+
+# Training Hyperparameters
+train:
+  epochs: 50
+  learning_rate: 0.00005          # Low learning rate for fine-tuning
+  optimizer: "adam"
+  loss: "binary_crossentropy"
+  metrics: ["accuracy", "Precision", "Recall"]
+  
+  callbacks:
+    early_stopping_patience: 5    # Note: Patience is 5 for this run
+    save_best_only: true
+    
+    use_lr_scheduler: true
+    reduce_lr_patience: 4
+    reduce_lr_factor: 0.5
+    reduce_lr_min: 0.000001

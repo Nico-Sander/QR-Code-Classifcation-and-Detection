@@ -1,0 +1,30 @@
+\babel@toc {ngerman}{}\relax 
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Größenvergleich der QR-Codes}}{8}{figure.1}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Exemplarische Auszüge aus den Datenquellen}}{11}{figure.1}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Exemplarische Darstellung der Patch-Kategorien}}{12}{figure.2}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Synthetische Beispiele der Positiv-Klasse}}{14}{figure.3}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces Synthetische Beispiele der Negativ-Klasse}}{14}{figure.4}%
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Trainingsverlauf Iteration 1}}{18}{figure.1}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Trainingsverlauf Iteration 2}}{20}{figure.2}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Trainingsverlauf Iteration 3}}{22}{figure.3}%
+\contentsline {figure}{\numberline {4.4}{\ignorespaces Trainingsverlauf Iteration 4}}{25}{figure.4}%
+\contentsline {figure}{\numberline {4.5}{\ignorespaces Trainingsverlauf Iteration 5}}{28}{figure.5}%
+\contentsline {figure}{\numberline {4.6}{\ignorespaces Trainingsverlauf Iteration 6}}{30}{figure.6}%
+\contentsline {figure}{\numberline {4.7}{\ignorespaces Trainingsverlauf Iteration 7}}{33}{figure.7}%
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Verlauf von \textit {Accuracy} und \textit {Loss} während des Trainings (\texttt {MobileNetV3Small}, Iteration 1)}}{37}{figure.1}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Verlauf von \textit {Accuracy} und \textit {Loss} während des Trainings (\texttt {MobileNetV3Small}, Iteration 2)}}{40}{figure.2}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Verlauf von \textit {Accuracy} und \textit {Loss} während des Trainings (\texttt {MobileNetV2}, Iteration 1)}}{43}{figure.3}%
+\contentsline {figure}{\numberline {5.4}{\ignorespaces Verlauf von \textit {Accuracy} und \textit {Loss} während des Trainings (\texttt {EfficientNetB0}, Iteration 1)}}{46}{figure.4}%
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Beispiel zur Analyse}}{47}{figure.1}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces Visualisierung des Sliding-Window-Rasters über verschiedene Skalierungsstufen hinweg.}}{49}{figure.2}%
+\contentsline {figure}{\numberline {6.3}{\ignorespaces Drei unterschiedliche SlidingWindow-Größen bei der gleichen Bildregion}}{50}{figure.3}%
+\contentsline {figure}{\numberline {6.4}{\ignorespaces Visualisierung des Prozesses: Vom Originalbild (links) zur akkumulierten Wahrscheinlichkeitsverteilung (rechts).}}{52}{figure.4}%
+\contentsline {figure}{\numberline {6.5}{\ignorespaces Finale normierte Heatmap: Die roten Bereiche markieren die Zentren der detektierten QR-Codes mit höchster Konfidenz.}}{53}{figure.5}%
+\contentsline {figure}{\numberline {6.6}{\ignorespaces Überlagerung der Heatmap auf das Originalbild}}{53}{figure.6}%
+\contentsline {figure}{\numberline {6.7}{\ignorespaces Finales Ergebnis der Inferenz: Der lokalisierte QR-Code wird durch eine grüne Bounding Box im Originalbild hervorgehoben.}}{55}{figure.7}%
+\contentsline {figure}{\numberline {6.8}{\ignorespaces Dashboardübersicht QR DETECTED.}}{56}{figure.8}%
+\contentsline {figure}{\numberline {6.9}{\ignorespaces Dashboardübersicht NO DETECTION.}}{57}{figure.9}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Darstellung des entschlüsselten QR-Codes}}{62}{figure.1}%
+\contentsline {figure}{\numberline {8.1}{\ignorespaces Einzelbild-Analyse mit Angabe der relativen Winkelabweichung.}}{64}{figure.1}%
+\contentsline {figure}{\numberline {8.2}{\ignorespaces Schematische Darstellung der Montageempfehlung}}{66}{figure.2}%
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
