@@ -1818,13 +1818,12 @@ Nachdem das Bild durch das Sliding-Window-Verfahren in eine Menge normalisierter
 
 \subsubsection{Datenvorbereitung und Farbraumanpassung}
 
-Ein kritischer Schritt vor der eigentlichen Inferenz ist die Anpassung der Bilddaten an das gewählte Modell. Da die Inferenz-Pipeline flexibel verschiedene Architekturen unterstützt, findet eine dynamische Vorverarbeitung statt:
+Ein kritischer Schritt vor der eigentlichen Inferenz ist die Anpassung der Bilddaten an das gewählte Modell. Da die Inferenz-Pipeline flexibel verschiedene Architekturen unterstützt, findet eine einheitliche Vorverarbeitung für alle Modelltypen statt:
 \begin{itemize}
-    \item \textbf{Original-Modell:} Für das selbst entwickelte CNN-Modell werden die Patches in Graustufen geladen und um eine Kanaldimension erweitert, um dem erwarteten Eingangsformat zu entsprechen.
-    \item \textbf{Transfer-Learning-Modelle:} Bei Modellen wie MobileNetV2 oder EfficientNetB0 erfolgt eine Konvertierung vom OpenCV-Standard BGR in den RGB-Farbraum. 
+    \item \textbf{Kanal-Formatierung:} Alle Patches werden direkt in Graustufen geladen und um eine Kanaldimension erweitert, um dem erwarteten Eingangsformat des jeweiligen Netzes zu entsprechen.
+    \item \textbf{Modell-Kompatibilität:} Bei den Transfer-Learning-Modellen ermöglicht ein Grayscale-Adapter die Verarbeitung einkanaliger Daten, wodurch eine Farbraum-Konvertierung nicht notwendig ist. 
 \end{itemize}
 Zusätzlich werden alle Bilddaten in den Datentyp \texttt{float32} konvertiert, um eine präzise Verarbeitung durch die Gewichte des neuronalen Netzes zu gewährleisten.
-
 \subsubsection{Batch-Verarbeitung und VRAM-Management}
 
 Um die Inferenzzeit bei der hohen Anzahl an extrahierten Patches (oft mehrere hundert pro Bild) zu minimieren, werden diese gesammelt in Batches verarbeitet. Dies erlaubt es der Grafikhardware, die Berechnungen durch massive Parallelisierung zu beschleunigen. 
@@ -1906,7 +1905,7 @@ Durch diese Normierung werden die mathematischen Hotspots in eine für den Mensc
     \includegraphics[width=0.5\textwidth]{Heatmap_auf_Orginalbild.png}
     \hfill
     \caption{Überlagerung der Heatmap auf das Originalbild}
-    \label{fig:final_heatmap_example}
+    \label{fig:heatmap_x_originpicture_example}
 \end{figure}
 
 \subsection{Finale Entscheidung und Lokalisierung}
@@ -1949,7 +1948,7 @@ Wurde mindestens eine valide Kontur gefunden, gilt das Bild als \glqq QR DETECTE
     \centering
     \includegraphics[width=0.8\textwidth]{ROI_Kennzeichnung.PNG}
     \caption{Finales Ergebnis der Inferenz: Der lokalisierte QR-Code wird durch eine grüne Bounding Box im Originalbild hervorgehoben.}
-    \label{fig:final_decision}
+    \label{fig:bounding_box}
 \end{figure}
 
 Sollten keine Konturen den \texttt{vote\_threshold} und die Größenfilterung passieren, wird das Bild als \glqq NO DETECTION\grqq\ markiert. Dies stellt sicher, dass die nachgelagerte und rechenintensive Decodierung nur auf Bildbereichen ausgeführt wird, in denen mit hoher Sicherheit ein QR-Code vorliegt.
@@ -1964,14 +1963,14 @@ Ergänzend zur grafischen Übersicht liefert die Statuszeile im Footer die Fakte
     \centering
     \includegraphics[width=0.8\textwidth]{GUI.png}
     \caption{Dashboardübersicht QR DETECTED.}
-    \label{fig:final_decision}
+    \label{fig:final_decision_with_qr}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\textwidth]{GUI_negativ.png}
     \caption{Dashboardübersicht NO DETECTION.}
-    \label{fig:final_decision}
+    \label{fig:final_decision_without_qr}
 \end{figure}
 
 % ==========================================
