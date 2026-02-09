@@ -145,7 +145,7 @@ def _add_layer(model, layer_cfg):
 if __name__ == "__main__":
     from pathlib import Path
     import yaml
-    cfg_path = Path("/home/nico/workspace/github.com/Nico-Sander/qr-code-detection-nico/runs/mobilenetv3small/run_02_unfreeze_base_20260206_133516/config_mnetv3s_final.yaml")
+    cfg_path = Path("/home/nico/workspace/github.com/Nico-Sander/KI-Project-WS2526/runs/custom/run_07_dataset_roboflow_grayscale_20260205_171521/config.yaml")
 
     if not cfg_path.exists():
         raise FileNotFoundError(f"Config file not found at: {cfg_path}")
