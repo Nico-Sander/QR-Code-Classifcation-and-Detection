@@ -213,4 +213,5 @@ dataset/
 tmp_matplotlib_cache
 
 # Modeldurchlauf
-/images
+/images/*
+!/images/samples/

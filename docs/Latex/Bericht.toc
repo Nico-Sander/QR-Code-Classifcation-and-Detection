@@ -1,5 +1,5 @@
 \babel@toc {ngerman}{}\relax 
-\contentsline {section}{\nonumberline Abbildungsverzeichnis}{4}{section*.2}%
+\contentsline {section}{\nonumberline Abbildungsverzeichnis}{4}{Doc-Start}%
 \contentsline {section}{\numberline {1}Einleitung}{5}{section.1}%
 \contentsline {subsection}{\numberline {1.1}Aufgabenstellung}{5}{subsection.1.1}%
 \contentsline {subsubsection}{\numberline {1.1.1}Klassifikation}{5}{subsubsection.1.1.1}%
@@ -71,7 +71,7 @@
 \contentsline {subsection}{\numberline {8.1}Methodik: Pose Estimation via SolvePnP}{63}{subsection.8.1}%
 \contentsline {subsection}{\numberline {8.2}Differenzierung der Winkel-Kategorien}{63}{subsection.8.2}%
 \contentsline {subsubsection}{\numberline {8.2.1}Der relative Tilt-Winkel (Bildspezifische Messung)}{63}{subsubsection.8.2.1}%
-\contentsline {subsubsection}{\numberline {8.2.2}Der absolute Montage-Winkel (Systemweite Empfehlung)}{64}{subsubsection.8.2.2}%
-\contentsline {subsection}{\numberline {8.3}Statistische Auswertung und Ergebnisse}{64}{subsection.8.3}%
+\contentsline {subsubsection}{\numberline {8.2.2}Der absolute Montage-Winkel (Systemweite Empfehlung)}{65}{subsubsection.8.2.2}%
+\contentsline {subsection}{\numberline {8.3}Statistische Auswertung und Ergebnisse}{65}{subsection.8.3}%
 \contentsline {subsection}{\numberline {8.4}Wissenschaftliche Begründung der Montageempfehlung}{65}{subsection.8.4}%
 \providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
