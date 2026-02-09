@@ -1393,6 +1393,20 @@ Die zugrundeliegende Hypothese ist, dass die auf \textit{ImageNet} vortrainierte
     \label{fig:training_mnetv3s_iter1}
 \end{figure}
 
+% 6. Metriken Tabelle
+\begin{table}[H]
+    \centering
+    \caption{Ergebnisse Iteration 1 (\texttt{MobileNetV3Small}), beste Epoche: 38}
+    \label{tab:results_mnetv3s_iter1}
+    \begin{tabular}{cccccc}
+        \toprule
+        \textbf{Train Loss} & \textbf{Val Loss} & \textbf{Train Acc} & \textbf{Val Acc} & \textbf{Val Precision} & \textbf{Val Recall} \\
+        \midrule
+        0,1103 & 0,1184 & 95,9\,\% & 95,5\,\% & 92,9\,\% & 88,9\,\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \textbf{Analyse} \\
 Das Modell zeigte ein stabiles, wenn auch initial langsames Lernverhalten. In der ersten Epoche lag der \textit{Recall} für die \textbf{Positiv-Klasse} bei lediglich $\approx 4,5\,\%$, stieg jedoch bis Epoche 5 rapide auf ein nutzbares Niveau an.
 
@@ -1495,6 +1509,20 @@ Die Hypothese lautet, dass die generischen Filter des \textit{ImageNet}-Training
     \caption{Verlauf von \textit{Accuracy} und \textit{Loss} während des Trainings (\texttt{MobileNetV3Small}, Iteration 2)}
     \label{fig:training_mnetv3s_iter2}
 \end{figure}
+
+% 6. Metriken Tabelle
+\begin{table}[H]
+    \centering
+    \caption{Ergebnisse Iteration 2 (\texttt{MobileNetV3Small}), beste Epoche: 20}
+    \label{tab:results_mnetv3s_iter2}
+    \begin{tabular}{cccccc}
+        \toprule
+        \textbf{Train Loss} & \textbf{Val Loss} & \textbf{Train Acc} & \textbf{Val Acc} & \textbf{Val Precision} & \textbf{Val Recall} \\
+        \midrule
+        0,0134 & 0,0356 & 99,5\,\% & 99,1\,\% & 99,6\,\% & 96,7\,\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \textbf{Analyse} \\
 Der Wechsel auf \textit{Full Fine-Tuning} erwies sich als entscheidender Durchbruch. Das Modell benötigte initial eine kurze Phase der Neuorientierung: In der ersten Epoche brachen die Validierungswerte kurzzeitig ein (,,\textit{Unfreeze-Schock}``, \textit{Recall} $\approx 0\,\%$), da sich die Gewichte auf die neuen Freiheitsgrade einstellen mussten. Bereits in Epoche 2 stabilisierte sich das Netz jedoch, und ab Epoche 5 lag der \textit{Recall} wieder über dem Niveau der ersten Iteration.
@@ -1599,6 +1627,20 @@ Es wird angenommen, dass die höhere Parameterzahl und die robustere Architektur
     \caption{Verlauf von \textit{Accuracy} und \textit{Loss} während des Trainings (\texttt{MobileNetV2}, Iteration 1)}
     \label{fig:training_mnetv2_iter1}
 \end{figure}
+
+% 6. Metriken Tabelle
+\begin{table}[H]
+    \centering
+    \caption{Ergebnisse Iteration 1 (\texttt{MobileNetV2}), beste Epoche: 35}
+    \label{tab:results_mnetv2_iter1}
+    \begin{tabular}{cccccc}
+        \toprule
+        \textbf{Train Loss} & \textbf{Val Loss} & \textbf{Train Acc} & \textbf{Val Acc} & \textbf{Val Precision} & \textbf{Val Recall} \\
+        \midrule
+        0,0022 & 0,0054 & 99,94\,\% & 99,86\,\% & 99,84\,\% & 99,59\,\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \textbf{Analyse} \\
 Das Experiment lieferte hervorragende Ergebnisse und übertraf die Leistung des \texttt{MobileNetV3Small} deutlich. Das Training wurde nach 43 Epochen durch \textit{EarlyStopping} beendet, wobei die besten Gewichte aus \textbf{Epoche 35} gesichert wurden.
@@ -1705,6 +1747,20 @@ Es wird geprüft, ob die komplexeren \textit{Features} des \texttt{EfficientNet}
     \caption{Verlauf von \textit{Accuracy} und \textit{Loss} während des Trainings (\texttt{EfficientNetB0}, Iteration 1)}
     \label{fig:training_effnetb0_iter1}
 \end{figure}
+
+% 6. Metriken Tabelle
+\begin{table}[H]
+    \centering
+    \caption{Ergebnisse Iteration 1 (\texttt{EfficientNetB0}), beste Epoche: 24}
+    \label{tab:results_effnetb0_iter1}
+    \begin{tabular}{cccccc}
+        \toprule
+        \textbf{Train Loss} & \textbf{Val Loss} & \textbf{Train Acc} & \textbf{Val Acc} & \textbf{Val Precision} & \textbf{Val Recall} \\
+        \midrule
+        0,0016 & 0,005 & 99,96\,\% & 99,87\,\% & 99,92\,\% & 99,55\,\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \textbf{Analyse} \\
 Das finale Experiment mit dem \texttt{EfficientNetB0} bestätigte das enorme Potenzial dieser Architektur, zeigte jedoch auch die erwartete höhere Sensibilität im Training. Das Modell erreichte nach einer volatilen Startphase absolute Spitzenwerte. Das Training wurde nach 29 Epochen beendet, wobei die besten Gewichte aus \textbf{Epoche 24} gesichert wurden.
