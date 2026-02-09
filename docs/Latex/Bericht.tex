@@ -211,7 +211,7 @@ Um eine hohe Varianz in den Trainingsdaten sicherzustellen und das Modell gegen 
 \begin{itemize}
     \item \textbf{Kurs-Material:} Ein grundlegender Teil der Daten wurde den auf der Lernplattform Ilias bereitgestellten Bildbeständen der Kurse \textit{Maschinenbau} sowie \textit{RKIM} entnommen.
     
-    \item \textbf{Eigene Aufnahmen:} Um spezifische Szenarien, die im Kursmaterial unterrepräsentiert waren, gezielt abzudecken, wurden ergänzend eigene Fotoserien angefertigt. Dies betrifft insbesondere Aufnahmen unter schwierigen Lichtverhältnissen oder Winkeln sowie Bilder mit einer hohen Dichte an ablenkenden Distractors wie Kassenzetteln, Parktickets und Zeitungen.
+    \item \textbf{Eigene Aufnahmen:} Um spezifische Szenarien, die im Kursmaterial unterrepräsentiert waren, gezielt abzudecken, wurden ergänzend eigene Fotoserien angefertigt. Dies betrifft insbesondere Aufnahmen unter schwierigen Lichtverhältnissen oder Winkeln sowie Bilder mit einer hohen Dichte an ablenkenden \textit{Distractors} wie Kassenzetteln, Parktickets und Zeitungen.
     
     \item \textbf{Pexels:} Für die Generierung synthetischer Trainingsdaten wurden lizenzfreie Bilder über die Plattform \href{https://www.pexels.com/}{pexels.com} bezogen. Diese dienen als hochauflösende Hintergründe, um synthetisch sowohl Beispiele der Positiv-Klasse als auch der Negativ-Klasse zu erzeugen. Die Auswahl erfolgte hierbei anhand relevanter Schlagwörter wie \textit{Auto}, \textit{Verkehr}, \textit{Clutter} oder \textit{City}.
 
@@ -262,7 +262,7 @@ Das Skript schiebt das Fenster über das Bild und berechnet für jede Position M
     
     \item \textbf{Ambiguous (Verworfen):} Liegt einer der Werte zwischen \textbf{10\,\%} und \textbf{85\,\%}, wird der Patch als ,,mehrdeutig`` eingestuft und komplett verworfen.
     
-    \item \textbf{Hard Negative:} Enthält ein Patch zu mehr als \textbf{20\,\%} einen Distractor (z.\,B. Textblock), wird er gezielt als negatives Beispiel (textit{Hard Negative}) gespeichert.
+    \item \textbf{Hard Negative:} Enthält ein Patch zu mehr als \textbf{20\,\%} einen Distractor (z.\,B. Textblock), wird er gezielt als \textit{hard} negatives Beispiel (\textit{Hard Negative}) gespeichert.
     
     \item \textbf{Soft Negative (Hintergrund):} Enthält der Ausschnitt weder QR-Code noch Distractor, erfolgt eine Analyse der Bildstruktur. Liegt die Standardabweichung der Grauwerte unter \textbf{25}, wird der Patch als kontrastarm (\textit{Flat}) klassifiziert; andernfalls gilt er als strukturreich (\textit{Textured}).
 \end{itemize}
@@ -708,7 +708,7 @@ Dies ist ein typischer \textit{Trade-off}: Das Modell lernt nun ,,vorsichtiger``
 
 % 3. Datensatz Zustand
 \textbf{Datengrundlage:}
-Die Datengrundlage blieb gegenüber Iteration 2 unverändert. Der Fokus dieser Iteration lag rein auf der Optimierung der Modellarchitektur und der Hyperparameter, um die Leistung auf dem bestehenden Datensatz (ca. 4.000 reale \textit{Patches}, ergänzt durch synthetische Daten) zu maximieren.
+Die Datengrundlage blieb gegenüber Iteration 2 unverändert. Der Fokus dieser Iteration lag rein auf der Optimierung der Modellarchitektur und der Hyperparameter, um die Leistung auf dem bestehenden Datensatz (ca. 4.000 reale, positive \textit{Patches}, ergänzt durch synthetische Daten) zu maximieren.
 
 % 4. Hypothese
 \textbf{Hypothese:}
